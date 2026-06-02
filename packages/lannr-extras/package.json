@@ -1,0 +1,26 @@
+{
+  "name": "lannr-extras",
+  "version": "0.1.0",
+  "type": "module",
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.d.ts"
+  ],
+  "exports": {
+    ".": "./dist/index.js",
+    "./memory": "./dist/memory/index.js",
+    "./scheduler": "./dist/scheduler/index.js",
+    "./workspace-tools": "./dist/workspace-tools/index.js",
+    "./workspace-tools/checkpoint": "./dist/workspace-tools/checkpoint.js",
+    "./browser": "./dist/browser/index.js",
+    "./mcp": "./dist/mcp/index.js",
+    "./mcp/client": "./dist/mcp/client.js",
+    "./mcp/registry": "./dist/mcp/registry.js",
+    "./mcp/bridge": "./dist/mcp/bridge.js",
+    "./devtools": "./dist/devtools/index.js"
+  },
+  "dependencies": {
+    "lannr-core": "workspace:*",
+    "zod": "^3.24.1"
+  }
+}

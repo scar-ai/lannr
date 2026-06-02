@@ -1,0 +1,22 @@
+{
+  "name": "lannr-sdk-workspace",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -b packages/lannr-core packages/lannr-extras packages/lannr-cli",
+    "test": "vitest run",
+    "typecheck": "tsc -b packages/lannr-core packages/lannr-extras packages/lannr-cli --pretty false"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  },
+  "dependencies": {
+    "commander": "^12.1.0",
+    "zod": "^3.24.1"
+  }
+}

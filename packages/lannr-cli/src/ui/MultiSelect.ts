@@ -1,0 +1,39 @@
+import React, { useState } from 'react';
+import { Box, Text, useInput } from 'ink';
+
+const h = React.createElement;
+
+export function MultiSelect({ items, onSelect, onCancel, label, initialValue }) {
+  const initialIdx = Math.max(0, items.findIndex(item =>
+    (typeof item === 'string' ? item : item.value) === initialValue
+  ));
+  const [index, setIndex] = useState(initialIdx);
+
+  useInput((_input, key) => {
+    if (key.upArrow) setIndex(i => (i - 1 + items.length) % items.length);
+    else if (key.downArrow) setIndex(i => (i + 1) % items.length);
+    else if (key.return) onSelect(items[index]);
+    else if (key.escape && onCancel) onCancel();
+  });
+
+  return h(Box, { flexDirection: 'column', paddingY: 1 },
+    label ? h(Box, { marginBottom: 1 },
+      h(Text, { bold: true, color: 'cyan' }, label)
+    ) : null,
+    ...items.map((item, i) => {
+      const isActive = i === index;
+      const itemLabel = typeof item === 'string' ? item : (item.label ?? item.value);
+      const hint = typeof item === 'object' ? item.hint : null;
+      return h(Box, { key: i, paddingX: 1 },
+        h(Text, { color: isActive ? 'cyan' : 'gray' }, isActive ? '❯ ' : '  '),
+        h(Text, { color: isActive ? 'white' : 'gray', bold: isActive }, itemLabel),
+        hint ? h(Text, { color: 'gray' }, ` — ${hint}`) : null
+      );
+    }),
+    h(Box, { marginTop: 1, paddingX: 1 },
+      h(Text, { color: 'gray', dimColor: true },
+        `↑↓ navigate  ↵ select${onCancel ? '  esc cancel' : ''}`
+      )
+    )
+  );
+}

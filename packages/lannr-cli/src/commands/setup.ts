@@ -1,0 +1,52 @@
+import { configureTools, runOnboard } from '../onboard.js'
+import { collect } from '../cli/helpers.js'
+
+export function register(program) {
+  program.command('setup')
+    .aliases(['onboard', 'configure', 'config'])
+    .description('Initialize local provider config and an agent workspace')
+    .option('--workspace <dir>', 'agent workspace directory')
+    .option('--non-interactive', 'run without prompts', false)
+    .option('--accept-risk', 'acknowledge local agent file/tool access risk', false)
+    .option('--flow <flow>', 'onboard flow: quickstart|advanced|manual')
+    .option('--mode <mode>', 'onboard mode: local')
+    .option('--auth-choice <choice>', 'provider/auth choice, e.g. openai, anthropic, opencode, custom-api-key, skip')
+    .option('--provider <id>', 'provider id for non-interactive setup')
+    .option('--api-key <key>', 'generic inline provider API key')
+    .option('--api-key-env <name>', 'generic provider API key env var')
+    .option('--openai-api-key <key>', 'OpenAI API key')
+    .option('--anthropic-api-key <key>', 'Anthropic API key')
+    .option('--google-api-key <key>', 'Google API key')
+    .option('--openrouter-api-key <key>', 'OpenRouter API key')
+    .option('--opencode-api-key <key>', 'OpenCode API key')
+    .option('--base-url <url>', 'provider base URL override')
+    .option('--model <model>', 'provider default model override')
+    .option('--endpoint <endpoint>', 'SDK endpoint mode')
+    .option('--custom-base-url <url>', 'custom provider base URL')
+    .option('--custom-api-key <key>', 'custom provider inline API key')
+    .option('--custom-model-id <id>', 'custom provider model ID')
+    .option('--custom-provider-id <id>', 'custom provider ID')
+    .option('--custom-compatibility <mode>', 'custom provider API compatibility: openai-compatible|anthropic|google')
+    .option('--agent-name <name>', 'default agent name')
+    .option('--agent-description <text>', 'default agent purpose')
+    .option('--agent-instructions <text>', 'default agent instructions')
+    .option('--alias <alias>', 'provider alias; can be repeated', collect, [])
+    .option('--skip-tour', 'skip the animated feature tour', false)
+    .option('--skip-chat', 'do not auto-launch chat after setup', false)
+    .action(async (opts) => {
+      await runOnboard(opts)
+    })
+
+  const tools = program.command('tools').description('Configure and inspect optional agent tools')
+
+  tools.command('setup')
+    .description('Configure optional webFetch and webSearch support')
+    .option('--provider <provider>', 'web search provider: exa|tavily|skip')
+    .option('--web-search-provider <provider>', 'web search provider: exa|tavily|skip')
+    .option('--api-key <key>', 'inline API key for the selected web search provider')
+    .option('--api-key-env <name>', 'environment variable containing the selected provider API key')
+    .option('--non-interactive', 'run without prompts', false)
+    .action(async (opts) => {
+      await configureTools(opts)
+    })
+}

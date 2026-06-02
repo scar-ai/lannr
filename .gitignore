@@ -1,0 +1,13 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.forge/cache/
+.forge/memory/
+.DS_Store
+tmp/
+.forge/
+.claude/
+.antigravity-cli/
+.antigravitycli/
+AGENTS.md
+LEAN-CTX.md

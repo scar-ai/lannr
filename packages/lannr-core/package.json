@@ -1,0 +1,33 @@
+{
+  "name": "lannr-core",
+  "version": "0.1.0",
+  "type": "module",
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.d.ts"
+  ],
+  "exports": {
+    ".": "./dist/index.js",
+    "./core": "./dist/core/index.js",
+    "./providers": "./dist/providers/index.js",
+    "./providers/registry": "./dist/providers/registry.js",
+    "./providers/rate-bus": "./dist/providers/rate-bus.js",
+    "./providers/rate-limits": "./dist/providers/rate-limits.js",
+    "./runner": "./dist/runner/index.js",
+    "./runner-node": "./dist/runner-node/index.js",
+    "./runner-wasm": "./dist/runner-wasm/index.js",
+    "./runner-edge": "./dist/runner-edge/index.js",
+    "./agents": "./dist/agents/index.js",
+    "./agents/registry": "./dist/agents/registry.js",
+    "./agents/sessions": "./dist/agents/sessions.js",
+    "./agents/memory": "./dist/agents/memory.js",
+    "./gateway": "./dist/gateway/index.js",
+    "./gateway/context-engine": "./dist/gateway/context-engine.js",
+    "./gateway/trajectory": "./dist/gateway/trajectory.js"
+  },
+  "dependencies": {
+    "gpt-tokenizer": "^3.4.0",
+    "quickjs-emscripten": "^0.32.0",
+    "zod": "^3.24.1"
+  }
+}
