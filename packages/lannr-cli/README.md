@@ -67,17 +67,7 @@ lannr setup
 lannr chat
 ```
 
-That's it. You now have a fully wired agent with **memory, routines, MCP, scheduling, and an interactive TUI**.
-
-```bash
-$ lannr setup
-? Which provider do you want to configure?  ❯ Anthropic
-? API key?  ●●●●●●●●●●●●●●●●
-? Default model?  claude-opus-4-8
-✓ Saved provider 'anthropic'
-✓ Created default agent
-→ Try:  lannr chat
-```
+That's it. `lannr setup` walks you through picking a provider, entering an API key, choosing a default model, and creating your first agent — then you have a fully wired agent with **memory, routines, MCP, scheduling, and an interactive TUI**.
 
 ---
 
@@ -286,6 +276,6 @@ Want the runtime internals — the `Vault`, trust progression, replay records, t
 
 **Built for agents that ship.**
 
-[CLI reference →](./CLI.md) · [Workspace README →](../../README.md) · [Full docs →](../../DOCS.md)
+[CLI reference →](https://github.com/scar-ai/lannr/blob/main/packages/lannr-cli/CLI.md) · [Workspace README →](https://github.com/scar-ai/lannr/blob/main/README.md) · [Full docs →](https://github.com/scar-ai/lannr/blob/main/DOCS.md)
 
 </div>

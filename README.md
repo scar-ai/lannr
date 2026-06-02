@@ -55,32 +55,39 @@ That one change unlocks everything:
 ## 🚀 Quick start (60 seconds)
 
 ```bash
-# 1. Install and build from this workspace
-pnpm install
-pnpm --filter lannr-cli build
+# 1. Install the CLI globally
+pnpm add -g lannr-cli   # or: npm i -g lannr-cli
 
-# 2. Link the CLI globally
-cd packages/lannr-cli
-pnpm setup # if pnpm has not configured a global bin directory yet
-pnpm link
-
-# You can also use npm for the global symlink after the pnpm build:
-# npm link
-
-# 3. Configure your first provider (Anthropic, OpenAI, Google, Codex, OpenRouter…)
+# 2. Configure your first provider (Anthropic, OpenAI, Google, Codex, OpenRouter…)
 lannr setup
 
-# 4. Talk to it
+# 3. Talk to it
 lannr chat
 ```
 
 That's it. You now have a fully wired agent with **memory, routines, MCP, scheduling, and an interactive TUI** — no glue code.
+
+<details>
+<summary><b>Building from this workspace instead</b></summary>
+
+```bash
+pnpm install
+pnpm --filter lannr-cli build
+
+cd packages/lannr-cli
+pnpm setup   # if pnpm has not configured a global bin directory yet
+pnpm link    # or: npm link
+```
+
+</details>
 
 ---
 
 ## ⚒ The Lannr CLI — *for everyone*
 
 The CLI is the **front door** to the entire runtime. Every capability — providers, agents, memory, routing, scheduling, browser tools, MCP — is reachable from one binary: `lannr`.
+
+> 🪄 **You don't even have to learn the commands.** Lannr agents understand the whole CLI. Ask in plain English mid-conversation — *"add the filesystem MCP server pointing to /tmp"*, *"remember that I prefer TypeScript"*, *"schedule a standup summary at 9 AM"* — and the agent runs the right command for you.
 
 ```
   ⚒  lannr
@@ -121,15 +128,7 @@ The CLI is the **front door** to the entire runtime. Every capability — provid
 <details open>
 <summary><b>🧙 <code>lannr setup</code> — onboarding in 60 seconds</b></summary>
 
-```bash
-$ lannr setup
-? Which provider do you want to configure?  ❯ Anthropic
-? API key?  ●●●●●●●●●●●●●●●●
-? Default model?  claude-opus-4-8
-✓ Saved provider 'anthropic'
-✓ Created default agent
-→ Try:  lannr chat
-```
+An interactive wizard walks you through picking a provider, entering an API key, choosing a default model, and creating your first agent.
 
 Fully scriptable for CI — every prompt has a flag:
 

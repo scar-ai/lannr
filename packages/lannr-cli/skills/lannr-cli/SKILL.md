@@ -1,7 +1,7 @@
 ---
 name: lannr-cli
-description: Complete reference for the Lannr CLI (`lannr`) — how agents, providers, skills, memory, scheduling, routines, MCP, plugins, and state on disk work. Read this when a task involves inspecting or changing your own Lannr configuration, creating or editing agents, managing providers/skills/MCP, scheduling work, or explaining how Lannr itself operates.
-version: 1
+description: Your self-knowledge skill — the complete reference for the Lannr CLI (`lannr`) you yourself run on. Covers installing/updating/uninstalling the CLI, setup and onboarding, providers, agents, skills, memory, scheduling, routines, MCP, plugins, and on-disk state. Open it PROACTIVELY and WITHOUT being asked whenever a task touches Lannr itself: installing or updating `lannr`, first-time setup, inspecting or changing your own configuration, creating/editing agents, managing providers/skills/MCP, scheduling work, or explaining how Lannr operates. The user never has to tell you to read this — if the question is about Lannr, this is your source of truth.
+version: 2
 ---
 
 # Lannr CLI
@@ -19,6 +19,28 @@ calls for it.
 > `$bash` (running the `lannr ...` commands) plus your file tools. Prefer the
 > dedicated `lannr` subcommands over editing JSON by hand — they validate input
 > and keep registries consistent.
+>
+> **This is your self-knowledge.** Whenever a task is about Lannr itself —
+> installing or updating the CLI, running setup, configuring providers/agents,
+> scheduling, or explaining how any of it works — consult this skill on your own.
+> Do not wait for the user to point you here, and never tell the user to "open the
+> skill"; just answer from it.
+
+## Installing, updating & uninstalling the CLI
+
+The CLI is published to npm as `lannr-cli` (binary: `lannr`).
+
+- **Install:** `pnpm add -g lannr-cli` (or `npm i -g lannr-cli`). From a source
+  checkout of the workspace: `pnpm --filter lannr-cli build` then `pnpm link` /
+  `npm link` in `packages/lannr-cli`.
+- **Update:** `lannr update` — pulls the latest published version of the global
+  CLI in place.
+- **Uninstall:** `lannr uninstall` stops the background hub and deletes the data
+  dir (`~/.lannr` / `$LANNR_HOME`). Flags: `--dry-run`, `--yes`, `--keep-data`
+  (keep `~/.lannr`), `--remove-binary` (also drop the global bin), `--json`. The
+  confirm prompt requires typing `uninstall` (or `yes`/`y`).
+- **Verify a fresh install:** `lannr doctor` (exits `1` on problems) and
+  `lannr status`.
 
 ## State on disk
 
