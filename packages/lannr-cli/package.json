@@ -1,11 +1,12 @@
 {
   "name": "lannr-cli",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "type": "module",
   "description": "Command-line interface for the Lannr local agent runtime.",
   "files": [
     "dist/**/*.js",
-    "dist/**/*.d.ts"
+    "dist/**/*.d.ts",
+    "skills/**"
   ],
   "bin": {
     "lannr": "dist/cli.js"
