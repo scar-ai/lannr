@@ -1,8 +1,8 @@
 import { mkdir } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { loadConfig } from '../config.js'
-import { agentRegistryPath } from '../agents/registry.js'
-import { providerRegistryPath } from '../providers/registry.js'
+import { agentRegistryPath, listAgents } from '../agents/registry.js'
+import { providerRegistryPath, listProviders } from '../providers/registry.js'
 import { openAICodexAuthPath } from '../providers/openai-codex-auth.js'
 import { printTable, uniqueById } from '../cli/helpers.js'
 
@@ -10,11 +10,15 @@ export async function ensureLannrHome() {
   await mkdir(dirname(agentRegistryPath()), { recursive: true })
 }
 
-export async function runDoctorChecks(config?: any) {
-  const cfg = config ?? await loadConfig()
+export async function runDoctorChecks() {
+  // Inspect the real registries, not loadConfig() — it fabricates synthetic
+  // "default" provider/agent entries when nothing is registered, which would
+  // make a brand-new install look already configured.
+  const [registeredProviders, registeredAgents] = await Promise.all([listProviders(), listAgents()])
   const issues = []
-  const providers = uniqueById(Object.values(cfg.providers))
-  const agents = uniqueById(Object.values(cfg.agents))
+  const providers = uniqueById(registeredProviders as any[])
+  const agents = uniqueById(registeredAgents as any[])
+  const providerIds = new Set(providers.map((provider) => provider.id))
   if (providers.length === 0) issues.push('No providers configured.')
   for (const provider of providers) {
     if (!provider.defaultModel) issues.push(`Provider "${provider.id}" has no default model.`)
@@ -25,7 +29,7 @@ export async function runDoctorChecks(config?: any) {
   }
   if (agents.length === 0) issues.push('No agents configured.')
   for (const agent of agents) {
-    if (!cfg.providers[agent.provider] && agent.provider !== 'default') {
+    if (!providerIds.has(agent.provider) && agent.provider !== 'default') {
       issues.push(`Agent "${agent.id}" references missing provider "${agent.provider}".`)
     }
   }
