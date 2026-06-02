@@ -20,7 +20,7 @@
     "./devtools": "./dist/devtools/index.js"
   },
   "dependencies": {
-    "lannr-core": "workspace:*",
+    "lannr-core": "^0.1.0",
     "zod": "^3.24.1"
   }
 }

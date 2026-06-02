@@ -8,7 +8,7 @@
     "dist/**/*.d.ts"
   ],
   "bin": {
-    "lannr": "./dist/cli.js"
+    "lannr": "dist/cli.js"
   },
   "exports": {
     ".": "./dist/cli.js"
@@ -21,8 +21,8 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "lannr-core": "workspace:*",
-    "lannr-extras": "workspace:*",
+    "lannr-core": "^0.1.0",
+    "lannr-extras": "^0.1.0",
     "commander": "^12.1.0",
     "ink": "^5.2.1",
     "ink-text-input": "^6.0.0",
