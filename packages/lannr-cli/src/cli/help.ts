@@ -17,7 +17,7 @@ export const color = {
 export const GROUPS = [
   {
     title: 'Getting started',
-    commands: ['setup', 'status', 'doctor'],
+    commands: ['setup', 'status', 'doctor', 'update'],
   },
   {
     title: 'Chat & run',

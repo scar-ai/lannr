@@ -32,6 +32,12 @@ pnpm build
 
 The binary is `lannr`.
 
+Update the global CLI to the latest published npm version:
+
+```sh
+lannr update
+```
+
 ## First-time Setup
 
 ```sh
