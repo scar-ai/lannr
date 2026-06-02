@@ -20,6 +20,7 @@ import { register as registerMcp } from './commands/mcp.js'
 import { register as registerSettings } from './commands/settings.js'
 import { register as registerSessions } from './commands/sessions.js'
 import { register as registerImport } from './commands/import.js'
+import { register as registerUninstall } from './commands/uninstall.js'
 import { getCliVersion } from './version.js'
 
 const program = new Command()
@@ -49,6 +50,7 @@ registerMcp(program)
 registerSettings(program)
 registerSessions(program)
 registerImport(program)
+registerUninstall(program)
 
 attachHelp(program)
 

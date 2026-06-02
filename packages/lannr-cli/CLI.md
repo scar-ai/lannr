@@ -732,6 +732,43 @@ Supported web search providers: `exa`, `tavily`, `skip`
 
 ---
 
+## Uninstall
+
+Completely and cleanly remove Lannr from the machine. This stops the background
+hub daemon and deletes the entire data directory (`~/.lannr`, or `$LANNR_HOME`):
+agents, sessions, skills, providers, scheduler state, and hub logs. It can also
+remove the global CLI package.
+
+```sh
+lannr uninstall                       # stop hub + delete ~/.lannr (asks to confirm)
+lannr uninstall --dry-run             # show what would be removed, delete nothing
+lannr uninstall --yes                 # skip the confirmation prompt
+lannr uninstall --keep-data           # remove only the binary, keep ~/.lannr
+lannr uninstall --remove-binary       # also uninstall the global CLI
+lannr uninstall --yes --remove-binary --json
+```
+
+| Flag | Description |
+| --- | --- |
+| `-y, --yes` | Skip the confirmation prompt |
+| `--keep-data` | Keep `~/.lannr` (use with `--remove-binary` to drop only the CLI) |
+| `--remove-binary` | Also uninstall the global `lannr-cli` bin |
+| `--dry-run` | Show what would be removed without deleting anything |
+| `--json` | Print the result as JSON |
+
+The confirmation prompt requires typing `uninstall` (or `yes`/`y`); any other
+answer aborts without touching anything.
+
+`--remove-binary` detects how the CLI was installed by looking at where `lannr`
+resolves on `PATH`, and runs the matching uninstall — `npm uninstall -g`,
+`pnpm remove -g`, `yarn global remove`, or `bun remove -g`. This handles both a
+published npm package and a `pnpm`/`yarn` global **link** to a source checkout.
+After running it the command re-checks `PATH` and reports whether the bin is
+actually gone (package managers exit `0` even when they removed nothing), and
+prints the exact command to finish by hand if anything still resolves.
+
+---
+
 ## Global Flags
 
 Most commands accept these flags where applicable:
