@@ -1,6 +1,6 @@
 {
   "name": "lannr-cli",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "type": "module",
   "description": "Command-line interface for the Lannr local agent runtime.",
   "files": [
