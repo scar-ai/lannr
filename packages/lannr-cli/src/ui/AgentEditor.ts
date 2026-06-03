@@ -5,7 +5,7 @@
 
 import React, { useState } from 'react'
 import { Box, Text, useApp, useInput } from 'ink'
-import TextInput from 'ink-text-input'
+import { LineEditor } from './LineEditor.js'
 
 const h = React.createElement
 
@@ -100,7 +100,7 @@ export function AgentEditor({ agent, providers, skills, onSave }) {
 
     const field = fields[index]
 
-    // Inline text editing mode (handled by TextInput onSubmit otherwise).
+    // Inline text editing mode (handled by the LineEditor onSubmit otherwise).
     if (editing) {
       if (key.escape) setEditing(false)
       return
@@ -207,7 +207,7 @@ function renderValue(field, draft, active, editing, setDraft, setEditing) {
   // text
   if (active && editing) {
     return h(Box, { borderStyle: 'round', borderColor: 'cyan', paddingX: 1 },
-      h(TextInput, {
+      h(LineEditor, {
         value: draft[field.key],
         onChange: (v) => setDraft((d) => ({ ...d, [field.key]: v })),
         onSubmit: () => setEditing(false),

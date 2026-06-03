@@ -5,6 +5,7 @@
 
 import React, { useState } from 'react'
 import { Box, Text, useInput } from 'ink'
+import { LineEditor } from './LineEditor.js'
 
 const h = React.createElement
 
@@ -18,7 +19,13 @@ export function ClarifyPrompt({ request, onAnswer, onCancel }) {
   const [index, setIndex] = useState(0)
   const [mode, setMode] = useState('select') // 'select' | 'freeText'
   const [text, setText] = useState('')
-  const [cursor, setCursor] = useState(0)
+
+  // Submit the free-text answer (Enter from the LineEditor).
+  const submitFreeText = () => {
+    const trimmed = text.trim()
+    if (!trimmed) return
+    onAnswer({ answer: trimmed, selectedIndex: null, freeText: trimmed })
+  }
 
   useInput((input, key) => {
     if (mode === 'select') {
@@ -65,49 +72,13 @@ export function ClarifyPrompt({ request, onAnswer, onCancel }) {
       return
     }
 
-    // freeText mode
+    // freeText mode: text editing is owned by the LineEditor below; here we
+    // only handle escape to return to the option list.
     if (key.escape) {
       setMode('select')
       setText('')
-      setCursor(0)
       return
     }
-    if (key.return) {
-      const trimmed = text.trim()
-      if (!trimmed) return
-      onAnswer({
-        answer: trimmed,
-        selectedIndex: null,
-        freeText: trimmed,
-      })
-      return
-    }
-    if (key.leftArrow) {
-      setCursor((c) => Math.max(0, c - 1))
-      return
-    }
-    if (key.rightArrow) {
-      setCursor((c) => Math.min(text.length, c + 1))
-      return
-    }
-    if (key.backspace || key.delete) {
-      if (cursor === 0) return
-      setText(text.slice(0, cursor - 1) + text.slice(cursor))
-      setCursor(cursor - 1)
-      return
-    }
-    if (key.ctrl && input === 'a') { setCursor(0); return }
-    if (key.ctrl && input === 'e') { setCursor(text.length); return }
-    if (key.ctrl && input === 'u') {
-      setText(text.slice(cursor))
-      setCursor(0)
-      return
-    }
-    if (key.ctrl) return
-    if (!input) return
-    if (input.charCodeAt(0) === 0x1b) return
-    setText(text.slice(0, cursor) + input + text.slice(cursor))
-    setCursor(cursor + input.length)
   })
 
   const header = h(Box, { flexDirection: 'column' },
@@ -157,7 +128,6 @@ export function ClarifyPrompt({ request, onAnswer, onCancel }) {
   }
 
   // freeText mode
-  const cursorChar = text.slice(cursor, cursor + 1) || ' '
   return h(Box, {
     flexDirection: 'column',
     marginY: 1,
@@ -168,14 +138,12 @@ export function ClarifyPrompt({ request, onAnswer, onCancel }) {
     header,
     h(Box, { marginTop: 1, paddingX: 1 },
       h(Text, { color: 'yellow', bold: true }, 'Other › '),
-      text ? h(Box, null,
-        h(Text, null, text.slice(0, cursor)),
-        h(Text, { inverse: true }, cursorChar),
-        h(Text, null, text.slice(cursor + 1)),
-      ) : h(Box, null,
-        h(Text, { inverse: true }, ' '),
-        h(Text, { color: 'gray', dimColor: true }, 'type your answer…'),
-      ),
+      h(LineEditor, {
+        value: text,
+        onChange: setText,
+        onSubmit: submitFreeText,
+        placeholder: 'type your answer…',
+      }),
     ),
     h(Box, { marginTop: 1, paddingX: 1 },
       h(Text, { color: 'gray', dimColor: true }, '↵ submit · esc back to options'),

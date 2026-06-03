@@ -21,47 +21,16 @@
 
 import React, { useEffect, useState } from 'react'
 import { Box, Text, useInput } from 'ink'
+import {
+  nextWordBoundary,
+  prevWordBoundary,
+  isHomeSeq,
+  isEndSeq,
+  isWordLeftSeq,
+  isWordRightSeq,
+} from './LineEditor.js'
 
 const h = React.createElement
-
-const WORD_RE = /\w/
-
-function nextWordBoundary(text, from) {
-  let pos = Math.min(from, text.length)
-  while (pos < text.length && !WORD_RE.test(text[pos])) pos++
-  while (pos < text.length && WORD_RE.test(text[pos])) pos++
-  return pos
-}
-
-function prevWordBoundary(text, from) {
-  let pos = Math.max(0, from)
-  while (pos > 0 && !WORD_RE.test(text[pos - 1])) pos--
-  while (pos > 0 && WORD_RE.test(text[pos - 1])) pos--
-  return pos
-}
-
-// Some terminals emit Home/End as raw escape sequences ink doesn't surface.
-// Recognise the most common variants by inspecting the raw `input` string.
-function isHomeSeq(input) {
-  return input === '\x1b[H' || input === '\x1bOH' || input === '\x1b[1~' || input === '\x1b[7~'
-}
-function isEndSeq(input) {
-  return input === '\x1b[F' || input === '\x1bOF' || input === '\x1b[4~' || input === '\x1b[8~'
-}
-
-// macOS Terminal + iTerm2 with "Esc+" option mode (the default) emit
-//   Option+Left  → ESC b   Option+Right → ESC f
-// Other terminals send the xterm modifier form
-//   Option+Left  → \x1b[1;3D / \x1b[1;5D    Option+Right → \x1b[1;3C / \x1b[1;5C
-// Ink doesn't decode either as arrow keys, so detect them explicitly.
-function isWordLeftSeq(input, key) {
-  if (key.meta && (input === 'b' || input === 'B')) return true
-  return input === '\x1b[1;3D' || input === '\x1b[1;5D' || input === '\x1bb'
-}
-function isWordRightSeq(input, key) {
-  if (key.meta && (input === 'f' || input === 'F')) return true
-  return input === '\x1b[1;3C' || input === '\x1b[1;5C' || input === '\x1bf'
-}
 
 export function InputBar({
   value,

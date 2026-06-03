@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Box, Text, useInput } from 'ink';
-import TextInput from 'ink-text-input';
+import { LineEditor } from './LineEditor.js';
 
 const h = React.createElement;
 
@@ -48,7 +48,7 @@ export function Form({ fields, onSubmit, onCancel, title }) {
     if (key.escape && onCancel) { onCancel(); return; }
     if (submitted || !field) return;
 
-    // Boolean fields are not driven by TextInput, so handle their keys here.
+    // Boolean fields are not driven by the LineEditor, so handle their keys here.
     if (field.type === 'boolean') {
       if (input === ' ') { setValues(prev => ({ ...prev, [field.name]: !prev[field.name] })); return; }
       if (key.return) handleSubmitField(field.name);
@@ -144,7 +144,7 @@ export function Form({ fields, onSubmit, onCancel, title }) {
           h(Text, { color: 'gray', dimColor: true }, '  ↵ choose')
         ) : null,
         isActive && !isBoolean && !isSkills ? h(Box, { marginLeft: 2, marginTop: 0, borderStyle: 'round', borderColor: hasError ? 'red' : 'cyan', paddingX: 1 },
-          h(TextInput, {
+          h(LineEditor, {
             value: values[field.name],
             onChange: v => setValues(prev => ({ ...prev, [field.name]: v })),
             onSubmit: () => handleSubmitField(field.name),
@@ -179,7 +179,7 @@ export function InlinePrompt({ label, defaultValue = '', secret = false, onSubmi
       defaultValue ? h(Text, { color: 'gray' }, ` (${defaultValue})`) : null
     ),
     h(Box, { borderStyle: 'round', borderColor: 'cyan', paddingX: 1, marginLeft: 2 },
-      h(TextInput, {
+      h(LineEditor, {
         value,
         onChange: setValue,
         onSubmit: () => onSubmit(value || defaultValue),
