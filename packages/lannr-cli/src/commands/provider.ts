@@ -10,7 +10,7 @@ import {
   upsertProvider,
 } from '../providers/registry.js'
 import { loginOpenAICodex } from '../providers/openai-codex-auth.js'
-import { runCodexLoginUi } from '../ui/CodexLogin.js'
+import { promptCodexAuthMode, runCodexLoginUi } from '../ui/CodexLogin.js'
 import { collect, listProviderCommand, prompt, promptForProvider } from '../cli/helpers.js'
 
 export function register(program) {
@@ -50,14 +50,21 @@ export function register(program) {
   provider.command('login')
     .description('Authenticate a provider')
     .argument('<id>', 'provider id')
-    .action(async (id) => {
+    .option('--browser', 'sign in via the browser OAuth flow (default)')
+    .option('--device-code', 'sign in by pairing a device code')
+    .action(async (id, opts) => {
       if (String(id).trim().toLowerCase() !== 'openai-codex') {
         console.error('Provider login is only implemented for openai-codex.')
         process.exitCode = 1
         return
       }
-      if (process.stdout.isTTY) await runCodexLoginUi()
-      else await loginOpenAICodex()
+      let mode: 'browser' | 'device' | undefined = opts.deviceCode ? 'device' : opts.browser ? 'browser' : undefined
+      if (process.stdout.isTTY) {
+        if (!mode) mode = await promptCodexAuthMode()
+        await runCodexLoginUi(mode)
+      } else {
+        await loginOpenAICodex({ mode: mode ?? 'device' })
+      }
     })
 
   provider.command('new')

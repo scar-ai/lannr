@@ -14,6 +14,7 @@ import { configureProviderOnly } from '../onboard.js'
 import { getOpenClawProviderPreset, listOpenClawProviderCatalog } from '../providers/openclaw-catalog.js'
 import { listProviders, providerRegistryPath, setPrimaryProvider, upsertProvider } from '../providers/registry.js'
 import { loginOpenAICodex, openAICodexAuthPath } from '../providers/openai-codex-auth.js'
+import { promptCodexAuthMode, runCodexLoginUi } from '../ui/CodexLogin.js'
 import { createAgentReactiveRoutineStore } from '../scheduler/store.js'
 import { Form } from '../ui/Form.js'
 import { MultiSelect } from '../ui/MultiSelect.js'
@@ -347,6 +348,10 @@ export async function promptForProvider({ id, opts }) {
   const isCustom = !preset || selectedPresetId === 'custom'
   const isOpenAICodex = preset?.id === 'openai-codex'
 
+  const codexAuthMode = isOpenAICodex
+    ? (input.isTTY ? await promptCodexAuthMode() : 'device')
+    : undefined
+
   const fields = isOpenAICodex ? [
     { name: 'id',    label: 'Provider ID',   placeholder: selectedPresetId, default: selectedPresetId, required: true },
     { name: 'model', label: 'Default model', placeholder: preset?.defaultModel ?? 'gpt-5.4-pro', default: preset?.defaultModel ?? '', required: true },
@@ -374,7 +379,8 @@ export async function promptForProvider({ id, opts }) {
   if (!values) return undefined
 
   if (isOpenAICodex) {
-    await loginOpenAICodex()
+    if (input.isTTY) await runCodexLoginUi(codexAuthMode ?? 'browser')
+    else await loginOpenAICodex({ mode: 'device' })
     return {
       id: values.id.trim() || selectedPresetId,
       name: opts.name ?? preset?.name ?? values.id,

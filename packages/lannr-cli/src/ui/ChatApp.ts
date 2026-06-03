@@ -615,6 +615,10 @@ export function ChatApp(opts) {
   const compactingClearRef = useRef(null);
   const userStopRef = useRef(false);
   const streamIterRef = useRef(null);
+  // Monotonic id of the active streaming turn. Bumped to invalidate a run
+  // (ESC, or a newer turn) without relying on effect cleanup — which would
+  // otherwise abort the in-flight turn whenever a message is merely queued.
+  const streamRunRef = useRef(0);
   useEffect(() => { sessionTokensRef.current = sessionTokens; }, [sessionTokens]);
   useEffect(() => { lastTurnUsageRef.current = lastTurnUsage; }, [lastTurnUsage]);
   const updateInputImages = useCallback((updater) => {
@@ -873,9 +877,9 @@ export function ChatApp(opts) {
     if (!sessionLoaded) return;
     if (messageQueueRef.current.length === 0) return;
     isStreamingRef.current = true;
+    const runId = ++streamRunRef.current;
     messageQueueRef.current.shift();
     setQueuedCount(messageQueueRef.current.length);
-    let cancelled = false;
     const state = agentState.current;
 
     async function doStream() {
@@ -901,7 +905,7 @@ export function ChatApp(opts) {
         }, () => {});
         streamIterRef.current = iter;
         for await (const event of iter) {
-          if (cancelled || userStopRef.current) break;
+          if (userStopRef.current || streamRunRef.current !== runId) break;
           if (event.runtime?.agentId) agentState.current.agentId = event.runtime.agentId;
           if (event.type === 'lannr:answer:delta') {
             fullText += event.text;
@@ -976,7 +980,8 @@ export function ChatApp(opts) {
           }
         }
 
-        if (!cancelled && fullText && !userStopRef.current) {
+        const stopped = userStopRef.current || streamRunRef.current !== runId;
+        if (!stopped && fullText) {
           conversationHistory.current.push({ role: 'assistant', content: fullText });
           trimHistory(conversationHistory.current, historyLimit);
           if (messageQueueRef.current.length > 0) {
@@ -988,23 +993,25 @@ export function ChatApp(opts) {
           setStreamingText('');
           setStreamingLabel(false);
         }
-        if (!cancelled && !userStopRef.current && !producedVisibleOutput) {
+        if (!stopped && !producedVisibleOutput) {
           setStaticItems(prev => [...prev, {
             type: 'info', id: `noresp-${Date.now()}`,
             text: '(no response from agent — try resending, or check provider/credentials)',
           }]);
         }
       } catch (error) {
-        if (!cancelled) {
+        if (streamRunRef.current === runId) {
           const msg = error instanceof Error ? error.message : String(error);
           setStaticItems(prev => [...prev, { type: 'error-msg', id: `err-${Date.now()}`, message: msg }]);
           setStreamingText('');
           setStreamingLabel(false);
         }
       } finally {
-        streamIterRef.current = null;
-        isStreamingRef.current = false;
-        if (!cancelled) {
+        // A newer run (or ESC) may have superseded this turn; if so, it owns
+        // the streaming latch and iterator now — leave them untouched.
+        if (streamRunRef.current === runId) {
+          streamIterRef.current = null;
+          isStreamingRef.current = false;
           setIsStreaming(false);
           // Re-fire the effect so a queued message (if any) gets drained.
           setQueueVersion(v => v + 1);
@@ -1013,7 +1020,9 @@ export function ChatApp(opts) {
     }
 
     doStream();
-    return () => { cancelled = true; };
+    // No cleanup-cancel: queuing a message bumps queueVersion and re-runs this
+    // effect; aborting the in-flight turn here would drop its answer and hang
+    // the spinner. Invalidation is explicit via streamRunRef (ESC / next turn).
   }, [queueVersion, historyLimit, sessionLoaded]);
 
   // ── Keyboard shortcuts ────────────────────────────────────────────────────
@@ -1034,6 +1043,12 @@ export function ChatApp(opts) {
       if (suggestions.length > 0) { setSuggestions([]); return; }
       if (isStreaming) {
         userStopRef.current = true;
+        // Invalidate the in-flight run and release the streaming latch now, so
+        // the next submitted message starts a fresh turn even if the old
+        // generator is still parked awaiting the model (and its finally never
+        // runs). The zombie run will no-op once it sees the run-id mismatch.
+        streamRunRef.current += 1;
+        isStreamingRef.current = false;
         messageQueueRef.current.length = 0;
         setQueuedCount(0);
         // Instant UI feedback — don't wait for the next generator yield.

@@ -5,7 +5,7 @@ import { render } from 'ink'
 import { getPrimaryProvider, listProviders, setPrimaryProvider, upsertProvider } from './providers/registry.js'
 import { defaultAgentWorkspace, listAgents, normalizeAgentId, upsertAgent } from './agents/registry.js'
 import { getOpenClawProviderPreset, listOpenClawProviderCatalog } from './providers/openclaw-catalog.js'
-import { runCodexLoginUi } from './ui/CodexLogin.js'
+import { promptCodexAuthMode, runCodexLoginUi } from './ui/CodexLogin.js'
 import { loadToolConfig, saveToolConfig, toolConfigPath } from './tools/web.js'
 import { MultiSelect } from './ui/MultiSelect.js'
 import { Confirm } from './ui/Confirm.js'
@@ -382,7 +382,10 @@ async function configureProviderFromOnboard(opts, { flow }) {
     throw new Error(`Provider "${preset.id}" cannot be configured for local Lannr agent chat: ${preset.unsupportedReason}`)
   }
   if (preset.id === 'openai-codex') {
-    if (!opts.nonInteractive) await runCodexLoginUi()
+    if (!opts.nonInteractive) {
+      const mode = normalizeCodexAuthMode(opts.codexAuthMode) ?? await promptCodexAuthMode()
+      await runCodexLoginUi(mode)
+    }
     const defaultModel = opts.model ?? (opts.nonInteractive ? preset.defaultModel : await promptWithDefault('Codex model', preset.defaultModel))
     return providerFromPreset(preset, { apiKey: undefined, apiKeyEnv: undefined, opts: { ...opts, model: defaultModel } })
   }
@@ -490,6 +493,14 @@ function normalizeChoice(value) {
   if (!normalized) return undefined
   if (normalized === 'custom' || normalized === 'custom-provider') return 'custom-api-key'
   return normalized
+}
+
+function normalizeCodexAuthMode(value) {
+  const normalized = String(value ?? '').trim().toLowerCase()
+  if (!normalized) return undefined
+  if (normalized === 'device' || normalized === 'device-code' || normalized === 'devicecode') return 'device'
+  if (normalized === 'browser' || normalized === 'oauth' || normalized === 'web') return 'browser'
+  return undefined
 }
 
 function normalizeCustomCompatibility(value) {
