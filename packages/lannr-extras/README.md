@@ -1,5 +1,3 @@
-<div align="center">
-
 # 🧰 &nbsp;`lannr-extras`
 
 ### **Batteries for the Lannr runtime.**
@@ -13,8 +11,6 @@
 [![Docs](https://img.shields.io/badge/docs-DOCS.md-3b82f6?style=flat-square)](https://github.com/scar-ai/lannr/blob/main/DOCS.md)
 
 [**Install**](#-install) · [**Modules**](#-the-module-surface) · [**Tour**](#-a-guided-tour) · [**Full docs**](https://github.com/scar-ai/lannr/blob/main/DOCS.md)
-
-</div>
 
 ---
 

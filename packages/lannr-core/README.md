@@ -1,5 +1,3 @@
-<div align="center">
-
 # 🧠 &nbsp;`lannr-core`
 
 ### **The code-native agentic runtime for TypeScript.**
@@ -13,8 +11,6 @@
 [![Docs](https://img.shields.io/badge/docs-DOCS.md-3b82f6?style=flat-square)](https://github.com/scar-ai/lannr/blob/main/DOCS.md)
 
 [**Install**](#-install) · [**Hello, Lannr**](#-hello-lannr--in-30-seconds) · [**Why programs?**](#-why-programs) · [**Exports**](#-the-export-surface) · [**Full docs**](https://github.com/scar-ai/lannr/blob/main/DOCS.md)
-
-</div>
 
 ---
 
