@@ -34,6 +34,9 @@ import { theme } from './theme.js'
 
 const h = React.createElement
 
+// Most rows the suggestion dropdown will draw before it starts scrolling.
+const MAX_VISIBLE_SUGGESTIONS = 8
+
 export function InputBar({
   value,
   onChange,
@@ -52,6 +55,23 @@ export function InputBar({
     : 'Send a message  (/help · !cmd for shell · drag in images)'
 
   const [cursor, setCursor] = useState(value.length)
+
+  // First suggestion index drawn in the dropdown. Scrolls to keep the
+  // highlighted row in view once the list grows past MAX_VISIBLE_SUGGESTIONS,
+  // so wrapping past the top/bottom row reveals the hidden commands instead of
+  // running the selection off-frame.
+  const [suggestionWindowStart, setSuggestionWindowStart] = useState(0)
+  useEffect(() => {
+    setSuggestionWindowStart((start) => {
+      const maxStart = Math.max(0, suggestions.length - MAX_VISIBLE_SUGGESTIONS)
+      let next = Math.min(start, maxStart)
+      if (suggestionIdx < next) next = suggestionIdx
+      else if (suggestionIdx >= next + MAX_VISIBLE_SUGGESTIONS) {
+        next = suggestionIdx - MAX_VISIBLE_SUGGESTIONS + 1
+      }
+      return Math.min(Math.max(0, next), maxStart)
+    })
+  }, [suggestionIdx, suggestions.length])
 
   // Shell-style ↑/↓ recall. `histIdx` is the position in historyRef.current we
   // are showing (0 = oldest), or null when on the live draft. `draftRef` holds
@@ -234,16 +254,24 @@ export function InputBar({
     suggestions.length > 0 ? h(Box, {
       flexDirection: 'column', borderStyle: 'round', borderColor: c.accentDim, paddingX: 1, marginBottom: 0,
     },
-      ...suggestions.slice(0, 8).map((s, i) =>
-        h(Box, { key: s.cmd },
-          h(Text, { color: i === suggestionIdx ? c.accent : c.muted, bold: i === suggestionIdx },
-            `${i === suggestionIdx ? '❯ ' : '  '}${s.cmd.padEnd(12)}`
-          ),
-          h(Text, { color: c.dim }, s.desc)
-        )
-      ),
+      ...suggestions
+        .slice(suggestionWindowStart, suggestionWindowStart + MAX_VISIBLE_SUGGESTIONS)
+        .map((s, i) => {
+          const idx = suggestionWindowStart + i
+          const selected = idx === suggestionIdx
+          return h(Box, { key: s.cmd },
+            h(Text, { color: selected ? c.accent : c.muted, bold: selected },
+              `${selected ? '❯ ' : '  '}${s.cmd.padEnd(12)}`
+            ),
+            h(Text, { color: c.dim }, s.desc)
+          )
+        }),
       h(Box, { marginTop: 0 },
-        h(Text, { color: c.dim }, '[enter] run  [tab] complete  [↑↓] navigate  [esc] dismiss')
+        h(Text, { color: c.dim },
+          suggestions.length > MAX_VISIBLE_SUGGESTIONS
+            ? `[enter] run  [tab] complete  [↑↓] navigate  [esc] dismiss  (${suggestionIdx + 1}/${suggestions.length})`
+            : '[enter] run  [tab] complete  [↑↓] navigate  [esc] dismiss'
+        )
       )
     ) : null,
     h(Box, { borderStyle: 'round', borderColor: isStreaming ? c.warn : c.accent, paddingX: 1 },
