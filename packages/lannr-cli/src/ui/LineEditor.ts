@@ -49,6 +49,32 @@ export function isEndSeq(input) {
   return input === '\x1b[F' || input === '\x1bOF' || input === '\x1b[4~' || input === '\x1b[8~'
 }
 
+// Shift+Enter has no single encoding: terminals disagree. iTerm2 / xterm with
+// modifyOtherKeys send the CSI-tilde form (ESC [ 27 ; 2 ; 13 ~), the kitty /
+// CSI-u protocol sends ESC [ 13 ; 2 u, and a few send a bare ESC CR. Ink decodes
+// none of these as Enter, so without explicit handling the leading ESC is
+// dropped and the tail (`[27;2;13~`) leaks in as printable "weird" text. Detect
+// every variant and treat it as a newline insert. (10 = LF, 13 = CR; modifier 2
+// = Shift.)
+export function isShiftEnterSeq(input) {
+  // Ink sometimes strips the leading ESC (surfacing it as key.escape) and hands
+  // us only the sequence tail — e.g. Ghostty's kitty CSI-u "[13;2u". Normalize
+  // by tolerating a missing ESC prefix so both the whole sequence and the bare
+  // tail are caught.
+  const hadEsc = input.startsWith('\x1b')
+  const s = hadEsc ? input.slice(1) : input
+  // ESC+CR / ESC+LF only count with the ESC present — a bare \r / \n is plain
+  // Enter and must not be swallowed here.
+  if (hadEsc && (s === '\r' || s === '\n')) return true
+  return (
+    s === 'OM' ||
+    s === '[27;2;13~' ||
+    s === '[27;2;10~' ||
+    s === '[13;2u' ||  // kitty CSI-u: Shift+Enter  (Ghostty, kitty, foot, …)
+    s === '[10;2u'
+  )
+}
+
 // macOS Terminal + iTerm2 with "Esc+" option mode (the default) emit
 //   Option+Left  → ESC b   Option+Right → ESC f
 // Other terminals send the xterm modifier form

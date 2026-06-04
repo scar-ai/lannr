@@ -29,6 +29,7 @@ import {
   isEndSeq,
   isWordLeftSeq,
   isWordRightSeq,
+  isShiftEnterSeq,
 } from './LineEditor.js'
 import { theme } from './theme.js'
 
@@ -139,6 +140,16 @@ export function InputBar({
     if (key.ctrl && input === 'c') return
     // While suggestions are open, parent owns ↑/↓ for list navigation.
     if (suggestions.length > 0 && (key.upArrow || key.downArrow)) return
+
+    // Shift+Enter delivered as a raw escape sequence (iTerm2/xterm/kitty) —
+    // insert a newline. Handled before the catch-all escape drop below so the
+    // sequence's tail can't leak in as stray printable characters.
+    if (isShiftEnterSeq(input)) {
+      setHistIdx(null)
+      onChange?.(value.slice(0, cursor) + '\n' + value.slice(cursor))
+      setCursor(cursor + 1)
+      return
+    }
 
     if (key.return) {
       // Shift+Enter inserts a newline instead of submitting (when the terminal
