@@ -23,11 +23,29 @@ import { register as registerImport } from './commands/import.js'
 import { register as registerUninstall } from './commands/uninstall.js'
 import { register as registerUpdate } from './commands/update.js'
 import { getCliVersion } from './version.js'
+import { loadActiveTheme } from './ui/theme.js'
+import { checkForUpdatesInBackground, getUpdateNotice } from './update-check.js'
 
 const program = new Command()
 
 program.name('lannr').description('Lannr agentic platform CLI').version(getCliVersion())
 program.showHelpAfterError()
+
+// Apply the user's saved color theme before any command renders, so every TUI
+// surface (chat, settings, agent editor, provider setup, onboarding) is themed
+// consistently — not just the chat screen.
+program.hook('preAction', async (_thisCommand, actionCommand) => {
+  await loadActiveTheme().catch(() => {})
+
+  // Refresh the cached latest-version (background, non-blocking) and show a
+  // banner — built from the previous run's cache — for every command except
+  // `update` itself. Written to stderr so piped/`--json` stdout stays clean.
+  checkForUpdatesInBackground()
+  if (actionCommand?.name() !== 'update' && process.stderr.isTTY) {
+    const notice = getUpdateNotice()
+    if (notice) process.stderr.write(`${notice}\n\n`)
+  }
+})
 
 program.action(async () => {
   await printHome()

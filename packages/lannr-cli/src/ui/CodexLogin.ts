@@ -2,6 +2,7 @@ import React from 'react'
 import { Box, render, Text } from 'ink'
 import { loginOpenAICodex } from '../providers/openai-codex-auth.js'
 import { MultiSelect } from './MultiSelect.js'
+import { theme } from './theme.js'
 
 const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
 
@@ -65,24 +66,25 @@ export async function runCodexLoginUi(mode: CodexAuthMode = 'browser') {
 
 export function CodexLoginPanel({ url, code, status, done, frame = 0, mode = 'browser' }) {
   const h = React.createElement
+  const c = theme()
   const mark = done ? '✓' : SPINNER_FRAMES[frame]
-  const accent = done ? 'green' : 'cyan'
+  const accent = done ? c.success : c.accent
   const subtitle = mode === 'device' ? '  ·  device pairing code' : '  ·  browser sign-in'
   return h(Box, { flexDirection: 'column', borderStyle: 'round', borderColor: accent, paddingX: 2, paddingY: 1, marginY: 1 },
     h(Box, null,
       h(Text, { color: accent, bold: true }, `${mark}  OpenAI Codex`),
-      h(Text, { color: 'gray', dimColor: true }, subtitle),
+      h(Text, { color: c.dim, dimColor: true }, subtitle),
     ),
     url ? h(Box, { marginTop: 1, flexDirection: 'column' },
-      h(Text, { color: 'gray' }, 'Open in your browser'),
-      h(Text, { color: 'cyan', underline: true }, `  ${url}`),
+      h(Text, { color: c.muted }, 'Open in your browser'),
+      h(Text, { color: c.accent, underline: true }, `  ${url}`),
     ) : null,
     code ? h(Box, { marginTop: 1, flexDirection: 'column' },
-      h(Text, { color: 'gray' }, 'Enter this code'),
-      h(Text, { color: 'yellow', bold: true }, `  ${code}`),
+      h(Text, { color: c.muted }, 'Enter this code'),
+      h(Text, { color: c.warn, bold: true }, `  ${code}`),
     ) : null,
     h(Box, { marginTop: 1 },
-      h(Text, { color: done ? 'green' : 'gray', dimColor: !done }, done ? `${mark} ${status}` : status),
+      h(Text, { color: done ? c.success : c.muted, dimColor: !done }, done ? `${mark} ${status}` : status),
     ),
   )
 }

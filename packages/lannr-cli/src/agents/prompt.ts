@@ -73,6 +73,7 @@ export async function buildAgentSystemPrompt(agent, workspace) {
       '- Provide a short description, the natural-language prompt to run at fire time, and exactly one trigger (every / in / runAt / cron).',
       '- Use `$listScheduledActions` before adding when the user might be duplicating an existing schedule.',
       '- In scheduled-action listings, status=due means queued/overdue and not yet completed; only treat lastRunStatus=success or status=completed as completed.',
+      '- After scheduling, ALWAYS warn the user that the Lannr gateway must be running for the scheduled call/agent turn to fire: it only executes while this CLI session is open or `lannr gateway up` is running in the background. If they close the CLI without the gateway up, the schedule will not run until it is back up.',
     ].join('\n'),
     'Operational rule: when a user refers to a file from the prior turn with "it", "that", "open it", "read it", "inspect it", or similar, act on the previously identified file. Do not re-list files unless the file path is unknown.',
     'Operational rule: when your previous answer offered a concrete next action and the user replies affirmatively, perform that action immediately.',

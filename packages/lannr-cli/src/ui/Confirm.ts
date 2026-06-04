@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { Box, Text, useInput } from 'ink';
+import { theme } from './theme.js';
 
 const h = React.createElement;
 
 export function Confirm({ message, initialValue = true, onConfirm }) {
+  const c = theme();
   const [selected, setSelected] = useState(initialValue);
 
   useInput((input, key) => {
@@ -14,11 +16,11 @@ export function Confirm({ message, initialValue = true, onConfirm }) {
   });
 
   return h(Box, { paddingY: 1 },
-    h(Text, { color: 'cyan', bold: true }, '› '),
-    h(Text, null, `${message}  `),
-    h(Text, { color: selected ? 'green' : 'gray', bold: selected }, 'Yes'),
-    h(Text, { color: 'gray' }, ' / '),
-    h(Text, { color: !selected ? 'red' : 'gray', bold: !selected }, 'No'),
-    h(Text, { color: 'gray', dimColor: true }, '  (y/n or ←→ then ↵)')
+    h(Text, { color: c.accent, bold: true }, '› '),
+    h(Text, { color: c.text }, `${message}  `),
+    h(Text, { color: selected ? c.success : c.muted, bold: selected }, 'Yes'),
+    h(Text, { color: c.muted }, ' / '),
+    h(Text, { color: !selected ? c.error : c.muted, bold: !selected }, 'No'),
+    h(Text, { color: c.dim, dimColor: true }, '  (y/n or ←→ then ↵)')
   );
 }

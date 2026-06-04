@@ -6,12 +6,14 @@
 import React, { useState } from 'react'
 import { Box, Text, useInput } from 'ink'
 import { LineEditor } from './LineEditor.js'
+import { theme } from './theme.js'
 
 const h = React.createElement
 
 const OTHER_LABEL = 'Other (type a free-text answer)'
 
 export function ClarifyPrompt({ request, onAnswer, onCancel }) {
+  const c = theme()
   const choices = request.options ?? []
   const totalChoices = choices.length + 1 // + Other
   const otherIndex = choices.length
@@ -83,14 +85,14 @@ export function ClarifyPrompt({ request, onAnswer, onCancel }) {
 
   const header = h(Box, { flexDirection: 'column' },
     h(Box, null,
-      h(Text, { color: 'magenta', bold: true }, '? '),
-      h(Text, { color: 'magenta', bold: true }, 'Lannr needs your input'),
+      h(Text, { color: c.assistant, bold: true }, '? '),
+      h(Text, { color: c.assistant, bold: true }, 'Lannr needs your input'),
     ),
     h(Box, { paddingLeft: 2, marginTop: 0 },
-      h(Text, { wrap: 'wrap' }, request.question || ''),
+      h(Text, { color: c.text, wrap: 'wrap' }, request.question || ''),
     ),
     request.reason ? h(Box, { paddingLeft: 2 },
-      h(Text, { color: 'gray', dimColor: true, wrap: 'wrap' }, request.reason),
+      h(Text, { color: c.dim, dimColor: true, wrap: 'wrap' }, request.reason),
     ) : null,
   )
 
@@ -100,27 +102,27 @@ export function ClarifyPrompt({ request, onAnswer, onCancel }) {
       marginY: 1,
       paddingX: 1,
       borderStyle: 'round',
-      borderColor: 'magenta',
+      borderColor: c.assistant,
     },
       header,
       h(Box, { flexDirection: 'column', marginTop: 1 },
         ...choices.map((opt, i) => {
           const active = i === index
           return h(Box, { key: `opt-${i}`, paddingX: 1 },
-            h(Text, { color: active ? 'cyan' : 'gray' }, active ? '❯ ' : '  '),
-            h(Text, { color: 'gray', dimColor: true }, `${i + 1}. `),
-            h(Text, { color: active ? 'white' : 'gray', bold: active }, opt.label),
-            opt.description ? h(Text, { color: 'gray', dimColor: true }, ` — ${opt.description}`) : null,
+            h(Text, { color: active ? c.accent : c.muted }, active ? '❯ ' : '  '),
+            h(Text, { color: c.dim, dimColor: true }, `${i + 1}. `),
+            h(Text, { color: active ? c.text : c.muted, bold: active }, opt.label),
+            opt.description ? h(Text, { color: c.dim, dimColor: true }, ` — ${opt.description}`) : null,
           )
         }),
         h(Box, { paddingX: 1 },
-          h(Text, { color: index === otherIndex ? 'cyan' : 'gray' }, index === otherIndex ? '❯ ' : '  '),
-          h(Text, { color: 'gray', dimColor: true }, 'o. '),
-          h(Text, { color: index === otherIndex ? 'yellow' : 'gray', bold: index === otherIndex }, OTHER_LABEL),
+          h(Text, { color: index === otherIndex ? c.accent : c.muted }, index === otherIndex ? '❯ ' : '  '),
+          h(Text, { color: c.dim, dimColor: true }, 'o. '),
+          h(Text, { color: index === otherIndex ? c.warn : c.muted, bold: index === otherIndex }, OTHER_LABEL),
         ),
       ),
       h(Box, { marginTop: 1, paddingX: 1 },
-        h(Text, { color: 'gray', dimColor: true },
+        h(Text, { color: c.dim, dimColor: true },
           '↑↓ navigate · 1–9/o quick-pick · ↵ select · esc dismiss',
         ),
       ),
@@ -133,11 +135,11 @@ export function ClarifyPrompt({ request, onAnswer, onCancel }) {
     marginY: 1,
     paddingX: 1,
     borderStyle: 'round',
-    borderColor: 'yellow',
+    borderColor: c.warn,
   },
     header,
     h(Box, { marginTop: 1, paddingX: 1 },
-      h(Text, { color: 'yellow', bold: true }, 'Other › '),
+      h(Text, { color: c.warn, bold: true }, 'Other › '),
       h(LineEditor, {
         value: text,
         onChange: setText,
@@ -146,7 +148,7 @@ export function ClarifyPrompt({ request, onAnswer, onCancel }) {
       }),
     ),
     h(Box, { marginTop: 1, paddingX: 1 },
-      h(Text, { color: 'gray', dimColor: true }, '↵ submit · esc back to options'),
+      h(Text, { color: c.dim, dimColor: true }, '↵ submit · esc back to options'),
     ),
   )
 }

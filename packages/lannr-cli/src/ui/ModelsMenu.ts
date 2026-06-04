@@ -5,12 +5,14 @@
 
 import React, { useState } from 'react'
 import { Box, Text, useInput } from 'ink'
+import { theme } from './theme.js'
 
 const h = React.createElement
 
 const VISIBLE_ROWS = 10
 
 export function ModelsMenu({ models, currentModelId, currentProviderId, onSelect, onCancel }) {
+  const c = theme()
   const [index, setIndex] = useState(() => {
     const idx = models.findIndex((m) => m.id === currentModelId && m.provider === currentProviderId)
     if (idx >= 0) return idx
@@ -41,15 +43,15 @@ export function ModelsMenu({ models, currentModelId, currentProviderId, onSelect
       marginY: 1,
       paddingX: 2,
       borderStyle: 'round',
-      borderColor: 'cyan',
+      borderColor: c.accentDim,
       alignSelf: 'center',
     },
-      h(Text, { color: 'cyan', bold: true }, 'Models'),
+      h(Text, { color: c.accent, bold: true }, 'Models'),
       h(Box, { marginTop: 1 },
-        h(Text, { color: 'gray' }, 'No models configured.')
+        h(Text, { color: c.muted }, 'No models configured.')
       ),
       h(Box, { marginTop: 1 },
-        h(Text, { color: 'gray', dimColor: true }, 'esc dismiss')
+        h(Text, { color: c.dim, dimColor: true }, 'esc dismiss')
       )
     )
   }
@@ -68,11 +70,11 @@ export function ModelsMenu({ models, currentModelId, currentProviderId, onSelect
       paddingX: 2,
       paddingY: 1,
       borderStyle: 'round',
-      borderColor: 'cyan',
+      borderColor: c.accentDim,
     },
       h(Box, null,
-        h(Text, { color: 'cyan', bold: true }, 'Models  '),
-        h(Text, { color: 'gray', dimColor: true }, `(${models.length} total)`)
+        h(Text, { color: c.accent, bold: true }, 'Models  '),
+        h(Text, { color: c.dim, dimColor: true }, `(${models.length} total)`)
       ),
       h(Box, { flexDirection: 'column', marginTop: 1 },
         ...window.map((m, i) => {
@@ -80,17 +82,17 @@ export function ModelsMenu({ models, currentModelId, currentProviderId, onSelect
           const active = realIdx === index
           const isCurrent = m.id === currentModelId && m.provider === currentProviderId
           return h(Box, { key: `${m.provider}:${m.id}` },
-            h(Text, { color: active ? 'cyan' : 'gray' }, active ? '❯ ' : '  '),
-            h(Text, { color: active ? 'white' : 'gray', bold: active }, m.id.padEnd(idWidth)),
-            h(Text, { color: 'gray', dimColor: true }, '  '),
-            h(Text, { color: active ? 'white' : 'gray', wrap: 'truncate-end' }, m.provider),
-            m.isDefault ? h(Text, { color: 'gray', dimColor: true }, '  (default)') : null,
-            isCurrent ? h(Text, { color: 'green', dimColor: true }, '  (current)') : null,
+            h(Text, { color: active ? c.accent : c.muted }, active ? '❯ ' : '  '),
+            h(Text, { color: active ? c.text : c.muted, bold: active }, m.id.padEnd(idWidth)),
+            h(Text, { color: c.dim, dimColor: true }, '  '),
+            h(Text, { color: active ? c.text : c.muted, wrap: 'truncate-end' }, m.provider),
+            m.isDefault ? h(Text, { color: c.dim, dimColor: true }, '  (default)') : null,
+            isCurrent ? h(Text, { color: c.success, dimColor: true }, '  (current)') : null,
           )
         })
       ),
       h(Box, { marginTop: 1 },
-        h(Text, { color: 'gray', dimColor: true }, '↑↓ navigate  ↵ switch  esc cancel')
+        h(Text, { color: c.dim, dimColor: true }, '↑↓ navigate  ↵ switch  esc cancel')
       )
     )
   )

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { LineEditor } from './LineEditor.js';
+import { theme } from './theme.js';
 
 const h = React.createElement;
 
@@ -12,6 +13,7 @@ function initialValue(f) {
 }
 
 export function Form({ fields, onSubmit, onCancel, title }) {
+  const c = theme();
   const [values, setValues] = useState(
     () => Object.fromEntries(fields.map(f => [f.name, initialValue(f)]))
   );
@@ -84,38 +86,38 @@ export function Form({ fields, onSubmit, onCancel, title }) {
     const allowed = values[activeField.name] ?? {};
     return h(Box, { flexDirection: 'column', paddingY: 1 },
       h(Box, { marginBottom: 1 },
-        h(Text, { bold: true, color: 'cyan' }, '⬡ Global skills')
+        h(Text, { bold: true, color: c.accent }, '⬡ Global skills')
       ),
       list.length === 0
-        ? h(Text, { color: 'gray', dimColor: true }, 'No global skills installed.')
+        ? h(Text, { color: c.dim, dimColor: true }, 'No global skills installed.')
         : h(Box, { flexDirection: 'column' },
           ...list.map((s, i) => {
             const active = i === pickerIdx;
             const on = allowed[s.name];
             return h(Box, { key: s.name },
-              h(Text, { color: active ? 'cyan' : 'gray' }, active ? '❯ ' : '  '),
-              h(Text, { color: on ? 'green' : 'gray' }, on ? '[x] ' : '[ ] '),
-              h(Text, { color: active ? 'white' : 'gray', bold: active }, s.name),
-              s.description ? h(Text, { color: 'gray', dimColor: true }, `  ${s.description}`) : null
+              h(Text, { color: active ? c.accent : c.muted }, active ? '❯ ' : '  '),
+              h(Text, { color: on ? c.success : c.muted }, on ? '[x] ' : '[ ] '),
+              h(Text, { color: active ? c.text : c.muted, bold: active }, s.name),
+              s.description ? h(Text, { color: c.dim, dimColor: true }, `  ${s.description}`) : null
             );
           })
         ),
       h(Box, { marginTop: 1 },
-        h(Text, { color: 'gray', dimColor: true }, '↑↓ navigate  space allow/deny  a toggle all  ↵ done  esc back')
+        h(Text, { color: c.dim, dimColor: true }, '↑↓ navigate  space allow/deny  a toggle all  ↵ done  esc back')
       )
     );
   }
 
   return h(Box, { flexDirection: 'column', paddingY: 1 },
     title ? h(Box, { marginBottom: 1 },
-      h(Text, { bold: true, color: 'cyan' }, `◆ ${title}`)
+      h(Text, { bold: true, color: c.accent }, `◆ ${title}`)
     ) : null,
     ...fields.map((field, i) => {
       const isActive = i === currentIdx && !submitted;
       const isDone = i < currentIdx || submitted;
       const hasError = Boolean(errors[field.name]);
       const statusChar = isDone ? '✓' : isActive ? '›' : '○';
-      const statusColor = isDone ? 'green' : isActive ? 'cyan' : 'gray';
+      const statusColor = isDone ? c.success : isActive ? c.accent : c.muted;
       const isBoolean = field.type === 'boolean';
       const isSkills = field.type === 'skills';
       const skillsCount = isSkills
@@ -125,25 +127,25 @@ export function Form({ fields, onSubmit, onCancel, title }) {
       return h(Box, { key: field.name, flexDirection: 'column', marginBottom: isActive ? 1 : 0 },
         h(Box, null,
           h(Text, { color: statusColor }, `${statusChar} `),
-          h(Text, { color: isActive ? 'white' : 'gray', bold: isActive }, field.label),
-          field.required && !isDone ? h(Text, { color: 'red' }, ' *') : null,
-          isDone && isBoolean ? h(Text, { color: 'gray' },
+          h(Text, { color: isActive ? c.text : c.muted, bold: isActive }, field.label),
+          field.required && !isDone ? h(Text, { color: c.error }, ' *') : null,
+          isDone && isBoolean ? h(Text, { color: c.muted },
             `  ${values[field.name] ? '[x] on' : '[ ] off'}`
           ) : null,
-          isDone && isSkills ? h(Text, { color: 'gray' }, `  ${skillsCount}`) : null,
-          isDone && !isBoolean && !isSkills && values[field.name] ? h(Text, { color: 'gray' },
+          isDone && isSkills ? h(Text, { color: c.muted }, `  ${skillsCount}`) : null,
+          isDone && !isBoolean && !isSkills && values[field.name] ? h(Text, { color: c.muted },
             `  ${field.secret ? '•'.repeat(Math.min(values[field.name].length, 12)) : values[field.name]}`
           ) : null
         ),
         isActive && isBoolean ? h(Box, { marginLeft: 2 },
-          h(Text, { color: values[field.name] ? 'green' : 'gray' },
+          h(Text, { color: values[field.name] ? c.success : c.muted },
             values[field.name] ? '[x] enabled' : '[ ] disabled')
         ) : null,
         isActive && isSkills ? h(Box, { marginLeft: 2 },
-          h(Text, { color: 'cyan' }, `[ ${skillsCount} ]`),
-          h(Text, { color: 'gray', dimColor: true }, '  ↵ choose')
+          h(Text, { color: c.accent }, `[ ${skillsCount} ]`),
+          h(Text, { color: c.dim, dimColor: true }, '  ↵ choose')
         ) : null,
-        isActive && !isBoolean && !isSkills ? h(Box, { marginLeft: 2, marginTop: 0, borderStyle: 'round', borderColor: hasError ? 'red' : 'cyan', paddingX: 1 },
+        isActive && !isBoolean && !isSkills ? h(Box, { marginLeft: 2, marginTop: 0, borderStyle: 'round', borderColor: hasError ? c.error : c.accent, paddingX: 1 },
           h(LineEditor, {
             value: values[field.name],
             onChange: v => setValues(prev => ({ ...prev, [field.name]: v })),
@@ -153,15 +155,15 @@ export function Form({ fields, onSubmit, onCancel, title }) {
           })
         ) : null,
         isActive && hasError ? h(Box, { marginLeft: 2 },
-          h(Text, { color: 'red' }, errors[field.name])
+          h(Text, { color: c.error }, errors[field.name])
         ) : null,
         isActive && field.hint && !hasError ? h(Box, { marginLeft: 2 },
-          h(Text, { color: 'gray', dimColor: true }, field.hint)
+          h(Text, { color: c.dim, dimColor: true }, field.hint)
         ) : null
       );
     }),
     h(Box, { marginTop: 1, paddingX: 1 },
-      h(Text, { color: 'gray', dimColor: true },
+      h(Text, { color: c.dim, dimColor: true },
         `${!submitted && fields[currentIdx]?.type === 'boolean' ? 'space toggle  ↵ confirm'
           : !submitted && fields[currentIdx]?.type === 'skills' ? '↵ choose skills'
           : '↵ confirm field'}${onCancel ? '  esc cancel' : ''}`
@@ -171,14 +173,15 @@ export function Form({ fields, onSubmit, onCancel, title }) {
 }
 
 export function InlinePrompt({ label, defaultValue = '', secret = false, onSubmit }) {
+  const c = theme();
   const [value, setValue] = useState(defaultValue);
   return h(Box, { flexDirection: 'column', paddingY: 1 },
     h(Box, { marginBottom: 0 },
-      h(Text, { color: 'cyan', bold: true }, '› '),
-      h(Text, { color: 'white' }, label),
-      defaultValue ? h(Text, { color: 'gray' }, ` (${defaultValue})`) : null
+      h(Text, { color: c.accent, bold: true }, '› '),
+      h(Text, { color: c.text }, label),
+      defaultValue ? h(Text, { color: c.muted }, ` (${defaultValue})`) : null
     ),
-    h(Box, { borderStyle: 'round', borderColor: 'cyan', paddingX: 1, marginLeft: 2 },
+    h(Box, { borderStyle: 'round', borderColor: c.accent, paddingX: 1, marginLeft: 2 },
       h(LineEditor, {
         value,
         onChange: setValue,

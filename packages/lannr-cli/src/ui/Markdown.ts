@@ -1,5 +1,6 @@
 import React from 'react';
 import { Box, Text } from 'ink';
+import { theme } from './theme.js';
 
 const h = React.createElement;
 
@@ -61,13 +62,14 @@ function tokenizeInline(text) {
 }
 
 function renderInline(tokens, keyPrefix = 'i') {
+  const c = theme();
   return tokens.map((tok, idx) => {
     const key = `${keyPrefix}-${idx}`;
     switch (tok.type) {
       case 'text':
-        return h(Text, { key }, tok.value);
+        return h(Text, { key, color: c.text }, tok.value);
       case 'code':
-        return h(Text, { key, color: 'cyan', backgroundColor: 'black' }, tok.value);
+        return h(Text, { key, color: c.tool, backgroundColor: 'black' }, tok.value);
       case 'bold':
         return h(Text, { key, bold: true }, renderInline(tok.children, key));
       case 'italic':
@@ -75,8 +77,8 @@ function renderInline(tokens, keyPrefix = 'i') {
       case 'strike':
         return h(Text, { key, strikethrough: true }, renderInline(tok.children, key));
       case 'link':
-        return h(Text, { key, color: 'blue', underline: true }, tok.label,
-          h(Text, { color: 'gray' }, ` (${tok.href})`));
+        return h(Text, { key, color: c.accent, underline: true }, tok.label,
+          h(Text, { color: c.dim }, ` (${tok.href})`));
       default:
         return null;
     }
@@ -172,27 +174,26 @@ function isBlockStart(line) {
     || /^\s*([-*+]|\d+\.)\s+/.test(line);
 }
 
-const HEADING_COLORS = ['magentaBright', 'cyanBright', 'cyan', 'blueBright', 'blue', 'gray'];
-
 function renderBlock(block, key) {
+  const c = theme();
   switch (block.type) {
     case 'heading': {
-      const color = HEADING_COLORS[Math.min(block.level - 1, HEADING_COLORS.length - 1)];
+      const color = block.level <= 1 ? c.accent : block.level === 2 ? c.assistant : c.accentDim;
       const prefix = '#'.repeat(block.level) + ' ';
       return h(Box, { key, marginTop: 1 },
         h(Text, { color, bold: true }, prefix, ...renderInline(tokenizeInline(block.text), `${key}-h`))
       );
     }
     case 'code': {
-      return h(Box, { key, flexDirection: 'column', marginY: 1, paddingX: 1, borderStyle: 'round', borderColor: 'gray' },
-        block.lang ? h(Text, { color: 'gray', dimColor: true }, block.lang) : null,
-        h(Text, { color: 'green' }, block.value)
+      return h(Box, { key, flexDirection: 'column', marginY: 1, paddingX: 1, borderStyle: 'round', borderColor: c.dim },
+        block.lang ? h(Text, { color: c.muted, dimColor: true }, block.lang) : null,
+        h(Text, { color: c.success }, block.value)
       );
     }
     case 'quote': {
       return h(Box, { key, paddingLeft: 1 },
-        h(Text, { color: 'gray' }, '▎ '),
-        h(Text, { color: 'gray', italic: true, wrap: 'wrap' }, ...renderInline(tokenizeInline(block.text), `${key}-q`))
+        h(Text, { color: c.accentDim }, '▎ '),
+        h(Text, { color: c.muted, italic: true, wrap: 'wrap' }, ...renderInline(tokenizeInline(block.text), `${key}-q`))
       );
     }
     case 'list': {
@@ -200,14 +201,14 @@ function renderBlock(block, key) {
         ...block.items.map((item, idx) => {
           const bullet = item.ordered ? `${item.marker} ` : '• ';
           return h(Box, { key: `${key}-li-${idx}`, paddingLeft: Math.floor(item.indent / 2) },
-            h(Text, { color: 'yellow' }, bullet),
+            h(Text, { color: c.tool }, bullet),
             h(Text, null, ...renderInline(tokenizeInline(item.text), `${key}-li-${idx}-x`))
           );
         })
       );
     }
     case 'hr':
-      return h(Box, { key, marginY: 0 }, h(Text, { color: 'gray' }, '─'.repeat(40)));
+      return h(Box, { key, marginY: 0 }, h(Text, { color: c.dim }, '─'.repeat(40)));
     case 'paragraph':
     default:
       return h(Box, { key },

@@ -154,6 +154,36 @@ lannr chat --agent dev --session work
 | `--no-tools` | Hide tool execution events |
 | `--thinking` | Show raw program output |
 
+#### In-chat slash commands
+
+Type `/` to autocomplete. Available while chatting:
+
+| Command | Description |
+| --- | --- |
+| `/help` | List commands |
+| `/status` | Current agent / session / provider / model |
+| `/context`, `/usage` | Token usage breakdown for the context window |
+| `/agent` | Browse agents and resume their last session |
+| `/model [name]` | Switch model (opens a picker with no argument) |
+| `/provider [id]` | Set/show the provider override |
+| `/sessions` | Browse and resume past sessions |
+| `/new` | Start a fresh session |
+| `/title <name>` | Name the current session |
+| `/history` | Show recent messages |
+| `/retry` | Re-run the last message |
+| `/copy` | Copy the last reply to the system clipboard |
+| `/save [path]` | Write the transcript to a markdown file |
+| `/compact` | Summarize the conversation history now |
+| `/theme [name]` | Switch color theme (`lannr`, `mono`, `dracula`, `nord`, `matrix`, `sunset`) |
+| `/tools`, `/verbose` | Toggle tool output |
+| `/thinking`, `/reasoning` | Toggle thinking output |
+| `/undo` | Restore the workspace to the last checkpoint |
+| `/fortune` | Draw a fortune |
+| `/clear` | Clear the screen |
+| `/exit`, `/quit` | Leave the TUI |
+
+Other input conventions: prefix a line with `!` to run a shell command, drag-and-drop or paste an image path to attach it, press `esc` to stop a running turn, and press `Ctrl+C` twice to quit. The chosen `/theme` persists across sessions in `~/.lannr/settings.json`.
+
 ---
 
 ## Agents

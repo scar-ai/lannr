@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Box, Text, useApp, useInput, Static } from 'ink';
 import { spawn } from 'node:child_process';
-import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { readFile, writeFile } from 'node:fs/promises';
+import { join, resolve as resolvePath } from 'node:path';
 import { createLannrGateway } from '../gateway.js';
 import { createAgentRuntime } from '../agents/runtime.js';
 import { instructionFiles } from '../agents/prompt.js';
@@ -23,6 +23,9 @@ import { SessionsMenu } from './SessionsMenu.js';
 import { AgentsMenu } from './AgentsMenu.js';
 import { ModelsMenu } from './ModelsMenu.js';
 import { startHubScheduler } from '../scheduler/manager.js';
+import { theme, themeNames, setTheme, persistTheme, loadActiveTheme } from './theme.js';
+import { copyToClipboard } from './clipboard.js';
+import { randomFortune } from './fortunes.js';
 
 const h = React.createElement;
 
@@ -37,11 +40,17 @@ const SLASH_COMMANDS = [
   { cmd: '/provider', desc: 'Set provider override' },
   { cmd: '/sessions', desc: 'Browse and resume past sessions for this agent' },
   { cmd: '/new',      desc: 'Start a new session' },
+  { cmd: '/title',    desc: 'Name the current session' },
   { cmd: '/history',  desc: 'Show chat history' },
+  { cmd: '/retry',    desc: 'Re-run the last message' },
+  { cmd: '/copy',     desc: "Copy the last reply to the clipboard" },
+  { cmd: '/save',     desc: 'Save the transcript to a markdown file' },
   { cmd: '/compact',  desc: 'Summarize the conversation history now' },
+  { cmd: '/theme',    desc: 'Switch the color theme' },
   { cmd: '/tools',    desc: 'Toggle tool output' },
   { cmd: '/thinking', desc: 'Toggle thinking output' },
   { cmd: '/undo',     desc: 'Restore the workspace to the last checkpoint' },
+  { cmd: '/fortune',  desc: 'Draw a fortune' },
   { cmd: '/clear',    desc: 'Clear the screen' },
   { cmd: '/exit',     desc: 'Exit Lannr TUI' },
 ];
@@ -167,51 +176,74 @@ function safeJson(value) {
   try { return JSON.stringify(value); } catch { return String(value); }
 }
 
+// Monotonic id source for static items. Date.now() alone collides when several
+// items are pushed in the same tick (e.g. /theme listing all palettes), which
+// trips React's duplicate-key warning, so append a per-process counter.
+let itemSeq = 0;
+function nextItemId(prefix) {
+  return `${prefix}-${Date.now()}-${itemSeq++}`;
+}
+
 // ─── Static item components ───────────────────────────────────────────────────
 
+function Hint({ keys, label }) {
+  const c = theme();
+  return h(Box, null,
+    h(Text, { color: c.accent, bold: true }, keys),
+    h(Text, { color: c.muted }, ` ${label}`)
+  );
+}
+
 function ItemHeader() {
+  const c = theme();
   return h(Box, { flexDirection: 'column', marginTop: 1, marginBottom: 1 },
-    h(Box, null,
-      h(Text, { color: 'cyan', bold: true }, '⬡ Lannr'),
-      h(Text, { color: 'gray' }, '  local agent runtime')
-    ),
-    h(Box, { marginTop: 0 },
-      h(Text, { color: 'gray' }, 'Type '),
-      h(Text, { color: 'cyan' }, '/help'),
-      h(Text, { color: 'gray' }, ' for commands · '),
-      h(Text, { color: 'cyan' }, '!cmd'),
-      h(Text, { color: 'gray' }, ' for shell · '),
-      h(Text, { color: 'cyan' }, 'esc'),
-      h(Text, { color: 'gray' }, ' to stop turn · '),
-      h(Text, { color: 'cyan' }, '/exit'),
-      h(Text, { color: 'gray' }, ' to quit · drag images in')
-    ),
-    h(Box, { marginTop: 0 },
-      h(Text, { color: 'gray', dimColor: true }, '─'.repeat(58))
+    h(Box, {
+      flexDirection: 'column', borderStyle: 'round', borderColor: c.accentDim,
+      paddingX: 2, paddingY: 0,
+    },
+      h(Box, null,
+        h(Text, { color: c.brand, bold: true }, '⬡  L A N N R'),
+        h(Text, { color: c.dim }, '   ·   '),
+        h(Text, { color: c.muted }, 'local agent runtime')
+      ),
+      h(Box, { marginTop: 0, columnGap: 3 },
+        h(Hint, { keys: '/help', label: 'commands' }),
+        h(Hint, { keys: '!cmd', label: 'shell' }),
+        h(Hint, { keys: 'esc', label: 'stop' }),
+        h(Hint, { keys: 'Ctrl+C', label: 'quit' })
+      )
     )
   );
 }
 
+// A colored left rail used to anchor each message turn to its speaker.
+function Gutter({ color }) {
+  return h(Text, { color }, '▌ ');
+}
+
 function ItemUser({ content }) {
+  const c = theme();
   const { text, images } = splitUserContent(content);
   return h(Box, { flexDirection: 'column', marginTop: 1 },
     h(Box, null,
-      h(Text, { color: 'cyan', bold: true }, 'You'),
-      h(Text, { color: 'gray' }, ' › '),
-      h(Text, { wrap: 'wrap' }, text || (images.length ? '(image only)' : ''))
+      h(Gutter, { color: c.user }),
+      h(Text, { color: c.user, bold: true }, 'You'),
+      h(Text, { color: c.dim }, '  '),
+      h(Text, { color: c.text, wrap: 'wrap' }, text || (images.length ? '(image only)' : ''))
     ),
-    ...images.map((img, i) => h(Box, { key: `img-${i}`, paddingLeft: 6 },
-      h(Text, { color: 'magenta' }, '↳ '),
-      h(Text, { color: 'gray' }, `image: ${img.filename ?? img.source ?? 'attachment'}`)
+    ...images.map((img, i) => h(Box, { key: `img-${i}`, paddingLeft: 2 },
+      h(Text, { color: c.assistant }, '  ↳ '),
+      h(Text, { color: c.muted }, `image: ${img.filename ?? img.source ?? 'attachment'}`)
     ))
   );
 }
 
-function ItemAssistant({ content }) {
-  return h(Box, { flexDirection: 'column', marginBottom: 1 },
+function ItemAssistant({ content, agentName }) {
+  const c = theme();
+  return h(Box, { flexDirection: 'column', marginTop: 1, marginBottom: 1 },
     h(Box, null,
-      h(Text, { color: 'magenta', bold: true }, '◆'),
-      h(Text, { color: 'gray' }, ' Lannr')
+      h(Gutter, { color: c.assistant }),
+      h(Text, { color: c.assistant, bold: true }, `◆ ${agentName || 'agent'}`)
     ),
     h(Box, { paddingLeft: 2 },
       h(Markdown, null, content)
@@ -220,77 +252,99 @@ function ItemAssistant({ content }) {
 }
 
 function ItemToolCall({ tool, input }) {
+  const c = theme();
   const args = safeJson(input);
   const preview = args.length > 72 ? args.slice(0, 72) + '…' : args;
   return h(Box, { paddingLeft: 2 },
-    h(Text, { color: 'yellow' }, '⟳ '),
-    h(Text, { color: 'yellow', bold: true }, tool),
-    h(Text, { color: 'gray' }, `  ${preview}`)
+    h(Text, { color: c.tool }, '╭ '),
+    h(Text, { color: c.tool, bold: true }, tool),
+    h(Text, { color: c.dim }, '  ' + preview)
   );
 }
 
 function ItemToolResult({ tool, durationMs }) {
+  const c = theme();
   return h(Box, { paddingLeft: 2 },
-    h(Text, { color: 'green' }, '↳ '),
-    h(Text, { color: 'gray' }, `${tool}  ok  ${durationMs}ms`)
+    h(Text, { color: c.toolOk }, '╰ '),
+    h(Text, { color: c.muted }, `${tool} `),
+    h(Text, { color: c.toolOk }, 'ok'),
+    h(Text, { color: c.dim }, durationMs != null ? `  ${durationMs}ms` : '')
   );
 }
 
 function ItemToolError({ tool, error }) {
+  const c = theme();
   return h(Box, { paddingLeft: 2 },
-    h(Text, { color: 'red' }, '✗ '),
-    h(Text, { color: 'red' }, `${tool}  error: ${error}`)
+    h(Text, { color: c.error }, '╰ '),
+    h(Text, { color: c.muted }, `${tool} `),
+    h(Text, { color: c.error }, `error: ${error}`)
   );
 }
 
 function ItemThinking({ text }) {
+  const c = theme();
   return h(Box, { paddingLeft: 2 },
-    h(Text, { color: 'gray', dimColor: true }, `[thinking] ${text.slice(0, 200)}`)
+    h(Text, { color: c.thinking, dimColor: true, italic: true }, `  ${text.slice(0, 200)}`)
   );
 }
 
 function ItemError({ message }) {
+  const c = theme();
   return h(Box, { paddingLeft: 2, marginY: 1 },
-    h(Text, { color: 'red' }, `✗  ${message}`)
+    h(Text, { color: c.error, bold: true }, '✗  '),
+    h(Text, { color: c.error }, message)
   );
 }
 
 function ItemInfo({ text }) {
+  const c = theme();
   return h(Box, { paddingLeft: 2 },
-    h(Text, { color: 'gray' }, `› ${text}`)
+    h(Text, { color: c.accentDim }, '› '),
+    h(Text, { color: c.muted }, text)
   );
 }
 
 function ItemHelp() {
-  return h(Box, { flexDirection: 'column', marginY: 1, paddingLeft: 2 },
-    h(Text, { color: 'cyan', bold: true }, 'Commands'),
+  const c = theme();
+  return h(Box, {
+    flexDirection: 'column', marginY: 1, paddingX: 2, paddingY: 0,
+    borderStyle: 'round', borderColor: c.accentDim,
+  },
+    h(Text, { color: c.accent, bold: true }, 'Commands'),
     ...SLASH_COMMANDS.map(({ cmd, desc }) =>
       h(Box, { key: cmd },
-        h(Text, { color: 'white' }, cmd.padEnd(14)),
-        h(Text, { color: 'gray' }, desc)
+        h(Text, { color: c.accent }, cmd.padEnd(12)),
+        h(Text, { color: c.muted }, desc)
       )
     ),
-    h(Text, { color: 'gray' }, '!<command>    run a local shell command'),
-    h(Text, { color: 'gray' }, 'images        drag-drop a photo or paste/type a path (PNG, JPG, WebP, GIF, BMP, HEIC)')
+    h(Box, { marginTop: 0 },
+      h(Text, { color: c.accent }, '!<cmd>'.padEnd(12)),
+      h(Text, { color: c.muted }, 'run a local shell command')
+    ),
+    h(Box, null,
+      h(Text, { color: c.accent }, 'images'.padEnd(12)),
+      h(Text, { color: c.muted }, 'drag-drop or paste a path (PNG, JPG, WebP, GIF, BMP, HEIC)')
+    )
   );
 }
 
 function ItemStatus({ agentId, session, primaryProvider, providerOverride, modelOverride, showTools, showThinking }) {
+  const c = theme();
   return h(Box, { flexDirection: 'column', marginY: 1, paddingLeft: 2 },
-    h(Text, { color: 'cyan', bold: true }, 'Status'),
-    h(Box, null, h(Text, { color: 'gray' }, 'agent         '), h(Text, { color: 'white' }, agentId)),
-    h(Box, null, h(Text, { color: 'gray' }, 'session       '), h(Text, { color: 'white' }, session)),
-    h(Box, null, h(Text, { color: 'gray' }, 'primary prov. '), h(Text, { color: 'white' }, primaryProvider)),
+    h(Text, { color: c.accent, bold: true }, 'Status'),
+    h(Box, null, h(Text, { color: c.muted }, 'agent         '), h(Text, { color: c.text }, agentId)),
+    h(Box, null, h(Text, { color: c.muted }, 'session       '), h(Text, { color: c.text }, session)),
+    h(Box, null, h(Text, { color: c.muted }, 'primary prov. '), h(Text, { color: c.text }, primaryProvider)),
     h(Box, null,
-      h(Text, { color: 'gray' }, 'prov. override'),
-      h(Text, { color: providerOverride ? 'white' : 'gray' }, ` ${providerOverride || 'none'}`)
+      h(Text, { color: c.muted }, 'prov. override'),
+      h(Text, { color: providerOverride ? c.text : c.muted }, ` ${providerOverride || 'none'}`)
     ),
     h(Box, null,
-      h(Text, { color: 'gray' }, 'model         '),
-      h(Text, { color: modelOverride ? 'white' : 'gray' }, modelOverride || 'agent default')
+      h(Text, { color: c.muted }, 'model         '),
+      h(Text, { color: modelOverride ? c.text : c.muted }, modelOverride || 'agent default')
     ),
-    h(Box, null, h(Text, { color: 'gray' }, 'tools         '), h(Text, { color: showTools ? 'green' : 'red' }, showTools ? 'on' : 'off')),
-    h(Box, null, h(Text, { color: 'gray' }, 'thinking      '), h(Text, { color: showThinking ? 'green' : 'red' }, showThinking ? 'on' : 'off'))
+    h(Box, null, h(Text, { color: c.muted }, 'tools         '), h(Text, { color: showTools ? c.success : c.error }, showTools ? 'on' : 'off')),
+    h(Box, null, h(Text, { color: c.muted }, 'thinking      '), h(Text, { color: showThinking ? c.success : c.error }, showThinking ? 'on' : 'off'))
   );
 }
 
@@ -298,13 +352,11 @@ function ItemContext({
   coreSystemTokens, agentFilesTokens, fileBreakdown,
   skillsTokens, skillsCount, runtimeTokens, toolsCount,
   perTurnTokens, conversationTokens, messageCount,
-  model, provider, exact, source, lastUsage,
+  model, provider, exact, source, lastUsage, sessionTokens,
   limit, approx,
 }) {
+  const c = theme();
   const labelWidth = 16;
-  const cacheDetail = lastUsage
-    ? `${formatCacheTokens(lastUsage)}${formatCacheHitPct(lastUsage)}`.replace(/^ · /, '  ')
-    : '';
 
   // The generation the model produced over the session — final answers plus the
   // reasoning and tool-call code that never persist into the message history —
@@ -313,20 +365,13 @@ function ItemContext({
   const conversationTotal = conversationTokens + generated;
 
   const segments = [
-    { label: 'System prompt',  tokens: coreSystemTokens, color: 'cyan' },
-    { label: 'Agent files',    tokens: agentFilesTokens, color: 'green',
+    { label: 'System prompt',  tokens: coreSystemTokens, color: c.accent },
+    { label: 'Agent files',    tokens: agentFilesTokens, color: c.success,
       detail: (fileBreakdown ?? []).map((f) => `${f.file.padEnd(14)} ${formatTokens(f.tokens).padStart(6)}`) },
-    { label: 'Skills catalog', tokens: skillsTokens,     color: 'magenta', suffix: ` (${skillsCount})` },
-    { label: 'Tools & runtime', tokens: runtimeTokens,   color: 'yellow',  suffix: ` (${toolsCount} tools)` },
-    { label: 'Memory & turn',  tokens: perTurnTokens,    color: 'blue' },
-    { label: 'Conversation',   tokens: conversationTotal, color: 'white', suffix: ` (${messageCount} msg)`,
-      detail: lastUsage
-        ? [
-            `↑ input    ${formatTokens(lastUsage.inputTokens).padStart(7)}${cacheDetail}`,
-            `↓ output   ${formatTokens(generated).padStart(7)}  answers + reasoning + tool-call code`,
-            `messages   ${formatTokens(conversationTokens).padStart(7)}  persisted history (sent next turn)`,
-          ]
-        : ['no measured usage yet'] },
+    { label: 'Skills catalog', tokens: skillsTokens,     color: c.assistant, suffix: ` (${skillsCount})` },
+    { label: 'Tools & runtime', tokens: runtimeTokens,   color: c.warn,  suffix: ` (${toolsCount} tools)` },
+    { label: 'Memory & turn',  tokens: perTurnTokens,    color: c.accentDim },
+    { label: 'Conversation',   tokens: conversationTotal, color: c.text, suffix: ` (${messageCount} msg)` },
   ];
   const total = segments.reduce((sum, s) => sum + s.tokens, 0) || 1;
 
@@ -338,66 +383,65 @@ function ItemContext({
   const used = measuredUsed || total;
   const winPct = Math.min(100, Math.round((used / windowLimit) * 100));
   const free = Math.max(0, windowLimit - used);
-  const winColor = winPct >= 85 ? 'red' : winPct >= 60 ? 'yellow' : 'green';
+  const winColor = winPct >= 85 ? c.error : winPct >= 60 ? c.warn : c.success;
   const usedNote = measuredUsed
     ? 'measured occupancy of last request'
     : 'estimated from composed prompt (no request yet)';
 
   return h(Box, { flexDirection: 'column', marginY: 1, paddingLeft: 2 },
     h(Box, null,
-      h(Text, { color: 'cyan', bold: true }, 'Context window'),
-      h(Text, { color: 'gray' }, `   ${model}${provider ? ` · ${provider}` : ''}`)
+      h(Text, { color: c.accent, bold: true }, 'Context window'),
+      h(Text, { color: c.muted }, `   ${model}${provider ? ` · ${provider}` : ''}`)
     ),
     h(Box, { marginTop: 1 },
       h(Text, { color: winColor }, usageBar(winPct, 28)),
-      h(Text, { color: 'white', bold: true }, `  ${formatTokens(used)} / ${approx ? '≈' : ''}${formatTokens(windowLimit)}`),
-      h(Text, { color: 'gray' }, `  ${winPct}% used · ${formatTokens(free)} free`)
+      h(Text, { color: c.text, bold: true }, `  ${formatTokens(used)} / ${approx ? '≈' : ''}${formatTokens(windowLimit)}`),
+      h(Text, { color: c.muted }, `  ${winPct}% used · ${formatTokens(free)} free`)
     ),
     h(Box, { marginBottom: 1 },
-      h(Text, { color: 'gray', dimColor: true }, `  ${usedNote}`)
+      h(Text, { color: c.dim, dimColor: true }, `  ${usedNote}`)
     ),
+    sessionTokens ? h(Box, { marginBottom: 1 },
+      h(Text, { color: c.muted, bold: true }, 'Session usage'),
+      h(Text, { color: c.text }, `   ↑${formatTokens(sessionTokens.inputTokens)} ↓${formatTokens(sessionTokens.outputTokens)}`),
+      h(Text, { color: c.muted }, `${formatCacheTokens(sessionTokens)}${formatCacheHitPct(sessionTokens)}`)
+    ) : null,
     h(Box, null,
-      h(Text, { color: 'gray', bold: true }, 'Composition'),
-      h(Text, { color: 'gray', dimColor: true }, '  (where the prompt tokens go)')
+      h(Text, { color: c.muted, bold: true }, 'Composition'),
+      h(Text, { color: c.dim, dimColor: true }, '  (where the prompt tokens go)')
     ),
     ...segments.flatMap((seg) => {
       const pct = Math.round((seg.tokens / total) * 100);
       const rows = [
         h(Box, { key: seg.label },
-          h(Text, { color: 'gray' }, (seg.label + (seg.suffix || '')).padEnd(labelWidth + 8).slice(0, labelWidth + 8)),
+          h(Text, { color: c.muted }, (seg.label + (seg.suffix || '')).padEnd(labelWidth + 8).slice(0, labelWidth + 8)),
           h(Text, { color: seg.color }, usageBar(pct)),
-          h(Text, { color: 'white' }, ` ${formatTokens(seg.tokens).padStart(6)}`),
-          h(Text, { color: 'gray' }, ` ${String(pct).padStart(3)}%`)
+          h(Text, { color: c.text }, ` ${formatTokens(seg.tokens).padStart(6)}`),
+          h(Text, { color: c.muted }, ` ${String(pct).padStart(3)}%`)
         ),
       ];
       for (const [i, line] of (seg.detail ?? []).entries()) {
         rows.push(h(Box, { key: `${seg.label}-d${i}`, paddingLeft: 2 },
-          h(Text, { color: 'gray', dimColor: true }, `· ${line}`)
+          h(Text, { color: c.dim, dimColor: true }, `· ${line}`)
         ));
       }
       return rows;
-    }),
-    h(Box, { marginTop: 1 },
-      h(Text, { color: 'cyan', bold: true }, 'Composed prompt'.padEnd(labelWidth + 8)),
-      h(Text, { color: 'white', bold: true }, ` ${formatTokens(total).padStart(28)} tokens`)
-    ),
-    h(Box, null,
-      h(Text, { color: exact ? 'green' : 'yellow', dimColor: true }, exact ? `✓ composition counted via ${source}; window usage measured by provider` : `≈ ${source}`)
-    )
+    })
   );
 }
 
 function ItemHistory({ messages }) {
+  const c = theme();
   return h(Box, { flexDirection: 'column', marginY: 1, paddingLeft: 2 },
-    h(Text, { color: 'cyan', bold: true }, `Session history (${messages.length} messages)`),
+    h(Text, { color: c.accent, bold: true }, `Session history (${messages.length} messages)`),
     ...messages.slice(-10).map((msg, i) => {
       const { text, images } = splitUserContent(msg.content);
       const summary = images.length
         ? `${text || '(image)'}  [${images.length} image${images.length === 1 ? '' : 's'}]`
         : text;
       return h(Box, { key: i },
-        h(Text, { color: msg.role === 'user' ? 'cyan' : 'magenta' }, msg.role.padEnd(10)),
-        h(Text, { color: 'gray' },
+        h(Text, { color: msg.role === 'user' ? c.user : c.assistant }, msg.role.padEnd(10)),
+        h(Text, { color: c.muted },
           summary.slice(0, 80) + (summary.length > 80 ? '…' : '')
         )
       );
@@ -406,58 +450,70 @@ function ItemHistory({ messages }) {
 }
 
 function ItemShellOutput({ command, output, stderr, code }) {
+  const c = theme();
   return h(Box, { flexDirection: 'column', paddingLeft: 2 },
     h(Box, null,
-      h(Text, { color: 'gray' }, '$ '),
-      h(Text, { color: 'white' }, command),
-      code !== 0 ? h(Text, { color: 'red' }, `  (exit ${code})`) : null
+      h(Text, { color: c.muted }, '$ '),
+      h(Text, { color: c.text }, command),
+      code !== 0 ? h(Text, { color: c.error }, `  (exit ${code})`) : null
     ),
     output?.trim() ? h(Box, { paddingLeft: 2 },
-      h(Text, { color: 'gray', wrap: 'wrap' }, output.trimEnd())
+      h(Text, { color: c.muted, wrap: 'wrap' }, output.trimEnd())
     ) : null,
     stderr?.trim() ? h(Box, { paddingLeft: 2 },
-      h(Text, { color: 'red', wrap: 'wrap' }, stderr.trimEnd())
+      h(Text, { color: c.error, wrap: 'wrap' }, stderr.trimEnd())
     ) : null
   );
 }
 
 function TodoPanel({ todos }) {
   if (!todos || todos.length === 0) return null;
+  const c = theme();
   const active = todos.filter((t) => t.status === 'pending' || t.status === 'in_progress');
   const done = todos.filter((t) => t.status === 'completed').length;
   const visible = active.length > 0 ? todos : todos.slice(-5);
+  const pct = Math.round((done / todos.length) * 100);
+  const barW = 12;
+  const filled = Math.max(0, Math.min(barW, Math.round((pct / 100) * barW)));
   const marker = (status) => {
-    if (status === 'completed') return { glyph: '✔', color: 'green' };
-    if (status === 'in_progress') return { glyph: '▶', color: 'yellow' };
-    if (status === 'cancelled') return { glyph: '✕', color: 'gray' };
-    return { glyph: '○', color: 'cyan' };
+    if (status === 'completed') return { glyph: '✔', color: c.success };
+    if (status === 'in_progress') return { glyph: '▶', color: c.warn };
+    if (status === 'cancelled') return { glyph: '✕', color: c.dim };
+    return { glyph: '○', color: c.accent };
   };
-  return h(Box, { flexDirection: 'column', marginY: 1, paddingX: 2, borderStyle: 'round', borderColor: 'cyan' },
+  return h(Box, { flexDirection: 'column', marginY: 1, paddingX: 2, borderStyle: 'round', borderColor: c.accentDim },
     h(Box, null,
-      h(Text, { color: 'cyan', bold: true }, '📋 tasks  '),
-      h(Text, { color: 'gray' }, `${done}/${todos.length} done · ${active.length} active`)
+      h(Text, { color: c.accent, bold: true }, 'Tasks  '),
+      h(Text, { color: c.success }, '█'.repeat(filled)),
+      h(Text, { color: c.dim }, '░'.repeat(barW - filled)),
+      h(Text, { color: c.muted }, `  ${done}/${todos.length} · ${active.length} active`)
     ),
     ...visible.map((item) => {
       const { glyph, color } = marker(item.status);
       const dim = item.status === 'completed' || item.status === 'cancelled';
       return h(Box, { key: item.id },
         h(Text, { color }, ` ${glyph} `),
-        h(Text, { dimColor: dim, wrap: 'truncate-end' }, item.content)
+        h(Text, { color: dim ? c.dim : c.text, dimColor: dim, wrap: 'truncate-end' }, item.content)
       );
     })
   );
 }
 
 function ItemClearSep() {
+  const c = theme();
   return h(Box, { flexDirection: 'column', marginTop: 2 },
     h(Text, null, '\n'.repeat(28)),
     h(Box, null,
-      h(Text, { color: 'cyan', bold: true }, '⬡ Lannr'),
-      h(Text, { color: 'gray' }, '  ──────────────────────────────── cleared')
-    ),
-    h(Box, null,
-      h(Text, { color: 'gray', dimColor: true }, '─'.repeat(58))
+      h(Text, { color: c.brand, bold: true }, '⬡ Lannr'),
+      h(Text, { color: c.dim }, '  ──────────────────────────────── cleared')
     )
+  );
+}
+
+function ItemFortune({ text }) {
+  const c = theme();
+  return h(Box, { paddingLeft: 2, marginY: 1 },
+    h(Text, { color: c.accent, italic: true }, text)
   );
 }
 
@@ -465,7 +521,7 @@ function StaticItem({ item }) {
   switch (item.type) {
     case 'header':       return h(ItemHeader, { key: item.id });
     case 'user':         return h(ItemUser, { key: item.id, content: item.content });
-    case 'assistant':    return h(ItemAssistant, { key: item.id, content: item.content });
+    case 'assistant':    return h(ItemAssistant, { key: item.id, content: item.content, agentName: item.agentName });
     case 'tool-call':    return h(ItemToolCall, { key: item.id, tool: item.tool, input: item.input });
     case 'tool-result':  return h(ItemToolResult, { key: item.id, tool: item.tool, durationMs: item.durationMs });
     case 'tool-error':   return h(ItemToolError, { key: item.id, tool: item.tool, error: item.error });
@@ -478,6 +534,7 @@ function StaticItem({ item }) {
     case 'history':      return h(ItemHistory, { key: item.id, messages: item.messages });
     case 'shell-output': return h(ItemShellOutput, { key: item.id, ...item });
     case 'clear-sep':    return h(ItemClearSep, { key: item.id });
+    case 'fortune':      return h(ItemFortune, { key: item.id, text: item.text });
     default:             return null;
   }
 }
@@ -485,6 +542,7 @@ function StaticItem({ item }) {
 // ─── Thinking indicator (left-to-right wave in blue/green theme) ─────────────
 
 function WaveText({ text, tick }) {
+  const c = theme();
   const chars = [...text];
   const len = chars.length;
   // Wave sweeps left → right, pauses briefly off-screen, then restarts.
@@ -493,12 +551,12 @@ function WaveText({ text, tick }) {
   return h(Text, null,
     ...chars.map((ch, i) => {
       const d = head - i;
-      let color = 'cyan';
+      let color = c.accentDim;
       let bold = false;
       let dim = true;
-      if (d === 0)              { color = 'greenBright'; bold = true;  dim = false; }
-      else if (d === 1 || d === -1) { color = 'cyanBright';  bold = true;  dim = false; }
-      else if (d === 2 || d === -2) { color = 'cyan';        bold = false; dim = false; }
+      if (d === 0)              { color = c.thinking; bold = true;  dim = false; }
+      else if (d === 1 || d === -1) { color = c.accent;   bold = true;  dim = false; }
+      else if (d === 2 || d === -2) { color = c.accentDim; bold = false; dim = false; }
       return h(Text, { key: i, color, bold, dimColor: dim }, ch);
     })
   );
@@ -518,10 +576,11 @@ function CompactingIndicator({ mode, beforeTokens, afterTokens, done }) {
   const stats = afterTokens
     ? `  ${formatTokens(beforeTokens)} → ${formatTokens(afterTokens)} tok`
     : (beforeTokens ? `  ${formatTokens(beforeTokens)} tok` : '');
+  const c = theme();
   return h(Box, { paddingLeft: 2 },
-    h(Text, { color: done ? 'green' : 'yellow' }, done ? '✔ ' : '⟳ '),
-    h(Text, { color: done ? 'green' : 'yellow', bold: true }, label),
-    h(Text, { color: 'gray' }, stats)
+    h(Text, { color: done ? c.success : c.warn }, done ? '✔ ' : '⟳ '),
+    h(Text, { color: done ? c.success : c.warn, bold: true }, label),
+    h(Text, { color: c.muted }, stats)
   );
 }
 
@@ -538,6 +597,61 @@ function ThinkingIndicator({ agentId, startedAt }) {
   const name = agentId || 'agent';
   const text = `${name} is thinking (${elapsed} seconds elapsed)`;
   return h(WaveText, { text, tick });
+}
+
+// Reused header for the live assistant region (streaming / compacting / settled)
+// so it matches the committed ItemAssistant turns above it.
+function AssistantLabel({ agentName }) {
+  const c = theme();
+  return h(Box, null,
+    h(Gutter, { color: c.assistant }),
+    h(Text, { color: c.assistant, bold: true }, `◆ ${agentName || 'agent'}`)
+  );
+}
+
+// Persistent bottom status bar: identity on the left, live token usage and
+// key hints flowing after it, separated by dim pipes. Wraps on narrow widths.
+function StatusBar({ agentName, session, provider, model, todos, windowUsage, rateState, confirmQuit, isStreaming }) {
+  const c = theme();
+  const parts = [];
+  const seg = (key, label, value, color) => h(Text, { key },
+    h(Text, { color: c.dim }, `${label} `),
+    h(Text, { color: color || c.text }, value)
+  );
+  parts.push(seg('agent', 'agent', agentName || 'default', c.user));
+  parts.push(seg('session', 'session', session, c.muted));
+  if (provider) parts.push(seg('provider', 'prov', provider, c.muted));
+  if (model) parts.push(seg('model', 'model', model, c.accent));
+  if (todos.length) {
+    const done = todos.filter((t) => t.status === 'completed').length;
+    parts.push(seg('todos', 'tasks', `${done}/${todos.length}`, c.success));
+  }
+  const occupancy = promptOccupancy(windowUsage);
+  if (occupancy) {
+    const { limit } = modelContextWindow(model);
+    const pct = Math.min(100, Math.round((occupancy / limit) * 100));
+    const color = pct >= 85 ? c.error : pct >= 60 ? c.warn : c.muted;
+    parts.push(seg('ctx', 'ctx', `${formatTokens(occupancy)}/${formatTokens(limit)} ${pct}%`, color));
+  }
+  if (rateState) {
+    const rate = formatRateStateCompact(rateState);
+    if (rate) parts.push(seg('rate', 'rate', rate, c.muted));
+  }
+
+  const interleaved = [];
+  parts.forEach((part, i) => {
+    if (i > 0) interleaved.push(h(Text, { key: `sep-${i}`, color: c.dim }, '  │  '));
+    interleaved.push(part);
+  });
+
+  const hint = confirmQuit
+    ? h(Text, { color: c.warn, bold: true }, 'press ^C again to quit')
+    : h(Text, { color: c.dim }, isStreaming ? '[esc] stop turn' : '^C ^C quit · /help');
+
+  return h(Box, { flexDirection: 'column', marginTop: 0 },
+    h(Box, { paddingX: 2, flexWrap: 'wrap' }, ...interleaved),
+    h(Box, { paddingX: 2 }, hint)
+  );
 }
 
 // ─── Main chat application ────────────────────────────────────────────────────
@@ -578,7 +692,8 @@ export function ChatApp(opts) {
     if (!text) return;
     completedAssistantRef.current = null;
     setCompletedAssistantState(null);
-    setStaticItems(prev => [...prev, { type: 'assistant', id: `asst-${Date.now()}`, content: text }]);
+    const agentName = agentState.current.agentName || agentState.current.agentId;
+    setStaticItems(prev => [...prev, { type: 'assistant', id: `asst-${Date.now()}`, content: text, agentName }]);
   }, []);
   const [inputValue, setInputValue] = useState('');
   const [, setInputImages] = useState([]);
@@ -606,6 +721,12 @@ export function ChatApp(opts) {
   const [streamingStartedAt, setStreamingStartedAt] = useState(null);
   const [sessionLoaded, setSessionLoaded] = useState(false);
   const [todos, setTodos] = useState([]);
+  // Double Ctrl+C to quit (single press clears input / stops a turn). Armed for
+  // a short window after the first empty-input Ctrl+C.
+  const [confirmQuit, setConfirmQuit] = useState(false);
+  const confirmQuitTimerRef = useRef(null);
+  // Re-render tick so a /theme switch repaints the whole tree immediately.
+  const [, setThemeTick] = useState(0);
   const [clarifyQueue, setClarifyQueue] = useState([]);
   const [sessionsMenu, setSessionsMenu] = useState(null); // null | { items: [...] }
   const [agentsMenu, setAgentsMenu] = useState(null); // null | { items: [...] }
@@ -646,6 +767,13 @@ export function ChatApp(opts) {
       clarifyBus.off('request', handler);
       detach();
     };
+  }, []);
+
+  // Apply the user's saved color theme on launch.
+  useEffect(() => {
+    let cancelled = false;
+    loadActiveTheme().then(() => { if (!cancelled) setThemeTick((n) => n + 1); }).catch(() => {});
+    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
@@ -986,7 +1114,7 @@ export function ChatApp(opts) {
           trimHistory(conversationHistory.current, historyLimit);
           if (messageQueueRef.current.length > 0) {
             // Next turn starts immediately — commit now to keep order correct.
-            setStaticItems(prev => [...prev, { type: 'assistant', id: `asst-${Date.now()}`, content: fullText }]);
+            setStaticItems(prev => [...prev, { type: 'assistant', id: `asst-${Date.now()}`, content: fullText, agentName: agentState.current.agentName || agentState.current.agentId }]);
           } else {
             setCompletedAssistant(fullText);
           }
@@ -1025,6 +1153,31 @@ export function ChatApp(opts) {
     // the spinner. Invalidation is explicit via streamRunRef (ESC / next turn).
   }, [queueVersion, historyLimit, sessionLoaded]);
 
+  // Stop the in-flight turn and drop any queued messages. Invalidates the run
+  // so the next submission starts fresh even if the old generator is still
+  // parked awaiting the model (its finally never runs); the zombie run no-ops
+  // once it sees the run-id mismatch.
+  const stopTurn = useCallback(() => {
+    userStopRef.current = true;
+    streamRunRef.current += 1;
+    isStreamingRef.current = false;
+    messageQueueRef.current.length = 0;
+    setQueuedCount(0);
+    setIsStreaming(false);
+    setStreamingText('');
+    setStreamingLabel(false);
+    if (compactingClearRef.current) {
+      clearTimeout(compactingClearRef.current);
+      compactingClearRef.current = null;
+    }
+    setCompacting(null);
+    setStaticItems(prev => [...prev, {
+      type: 'info', id: `stop-${Date.now()}`,
+      text: '(turn stopped by user)',
+    }]);
+    try { streamIterRef.current?.return?.(); } catch {}
+  }, []);
+
   // ── Keyboard shortcuts ────────────────────────────────────────────────────
   useInput((_input, key) => {
     // Clarify prompt / sessions menu own the keyboard while open — short-circuit
@@ -1035,38 +1188,31 @@ export function ChatApp(opts) {
     if (agentsMenu) return;
     if (modelsMenu) return;
     if (key.ctrl && _input === 'c') {
-      opts.onInterrupt?.(agentState.current.session, agentState.current.agentId);
-      exit();
+      // Progressive: close suggestions → clear a draft → stop a turn → quit.
+      // A bare Ctrl+C on an empty prompt arms a 2s "press again" window so a
+      // stray keypress never kills the session outright.
+      if (suggestions.length > 0) { setSuggestions([]); return; }
+      if (inputValue.trim()) {
+        setInputValue('');
+        setSuggestions([]);
+        updateInputImages([]);
+        return;
+      }
+      if (isStreaming) { stopTurn(); return; }
+      if (confirmQuit) {
+        if (confirmQuitTimerRef.current) clearTimeout(confirmQuitTimerRef.current);
+        opts.onInterrupt?.(agentState.current.session, agentState.current.agentId);
+        exit();
+        return;
+      }
+      setConfirmQuit(true);
+      if (confirmQuitTimerRef.current) clearTimeout(confirmQuitTimerRef.current);
+      confirmQuitTimerRef.current = setTimeout(() => setConfirmQuit(false), 2000);
       return;
     }
     if (key.escape) {
       if (suggestions.length > 0) { setSuggestions([]); return; }
-      if (isStreaming) {
-        userStopRef.current = true;
-        // Invalidate the in-flight run and release the streaming latch now, so
-        // the next submitted message starts a fresh turn even if the old
-        // generator is still parked awaiting the model (and its finally never
-        // runs). The zombie run will no-op once it sees the run-id mismatch.
-        streamRunRef.current += 1;
-        isStreamingRef.current = false;
-        messageQueueRef.current.length = 0;
-        setQueuedCount(0);
-        // Instant UI feedback — don't wait for the next generator yield.
-        setIsStreaming(false);
-        setStreamingText('');
-        setStreamingLabel(false);
-        if (compactingClearRef.current) {
-          clearTimeout(compactingClearRef.current);
-          compactingClearRef.current = null;
-        }
-        setCompacting(null);
-        setStaticItems(prev => [...prev, {
-          type: 'info', id: `stop-${Date.now()}`,
-          text: '(turn stopped by user)',
-        }]);
-        // Best-effort: tell the iterator to close so the background loop exits.
-        try { streamIterRef.current?.return?.(); } catch {}
-      }
+      if (isStreaming) stopTurn();
       return;
     }
     if (key.return && suggestions.length > 0) {
@@ -1093,6 +1239,7 @@ export function ChatApp(opts) {
   // ── Input change ──────────────────────────────────────────────────────────
   const handleInputChange = useCallback(async (val) => {
     const seq = ++inputParseSeqRef.current;
+    setConfirmQuit(false);
     setInputValue(val);
     updateInputImages((prev) => prev.filter((attachment) => val.includes(attachment.label)));
     if (val.startsWith('/')) {
@@ -1123,6 +1270,14 @@ export function ChatApp(opts) {
     }
   }, [updateInputImages]);
 
+  // Push a message into the turn queue and kick the streaming effect. Shared by
+  // normal submits and slash commands (e.g. /retry) that re-send a turn.
+  const enqueueMessage = useCallback((content) => {
+    messageQueueRef.current.push(content);
+    setQueuedCount(messageQueueRef.current.length);
+    setQueueVersion((v) => v + 1);
+  }, []);
+
   // ── Submit ────────────────────────────────────────────────────────────────
   const handleSubmit = useCallback(async (val) => {
     const trimmed = val.trim();
@@ -1146,7 +1301,7 @@ export function ChatApp(opts) {
     }
 
     if (trimmed.startsWith('/')) {
-      await handleSlashCommand(trimmed, agentState, conversationHistory, historyLimit, setStaticItems, setSessionTokens, exit, opts.onSessionChange, setCompacting, compactingClearRef, setSessionsMenu, setAgentsMenu, setModelsMenu, lastTurnUsageRef.current);
+      await handleSlashCommand(trimmed, agentState, conversationHistory, historyLimit, setStaticItems, setSessionTokens, exit, opts.onSessionChange, setCompacting, compactingClearRef, setSessionsMenu, setAgentsMenu, setModelsMenu, lastTurnUsageRef.current, { enqueue: enqueueMessage, repaint: bumpFooter, sessionTokens: sessionTokensRef.current });
       return;
     }
 
@@ -1196,11 +1351,8 @@ export function ChatApp(opts) {
     h(Static, { items: staticItems },
       item => h(StaticItem, { key: item.id, item })
     ),
-    isStreaming ? h(Box, { flexDirection: 'column', marginBottom: 1 },
-      h(Box, null,
-        h(Text, { color: 'magenta', bold: true }, '◆'),
-        h(Text, { color: 'gray' }, ' Lannr')
-      ),
+    isStreaming ? h(Box, { flexDirection: 'column', marginTop: 1, marginBottom: 1 },
+      h(AssistantLabel, { agentName: state.agentName || state.agentId }),
       compacting ? h(CompactingIndicator, { ...compacting }) : null,
       !streamingLabel && streamingStartedAt ? h(Box, { paddingLeft: 2 },
         h(ThinkingIndicator, { agentId: state.agentId, startedAt: streamingStartedAt })
@@ -1208,17 +1360,11 @@ export function ChatApp(opts) {
       streamingText ? h(Box, { paddingLeft: 2 },
         h(Markdown, null, streamingText)
       ) : null
-    ) : compacting ? h(Box, { flexDirection: 'column', marginBottom: 1 },
-      h(Box, null,
-        h(Text, { color: 'magenta', bold: true }, '◆'),
-        h(Text, { color: 'gray' }, ' Lannr')
-      ),
+    ) : compacting ? h(Box, { flexDirection: 'column', marginTop: 1, marginBottom: 1 },
+      h(AssistantLabel, { agentName: state.agentName || state.agentId }),
       h(CompactingIndicator, { ...compacting })
-    ) : completedAssistant ? h(Box, { flexDirection: 'column', marginBottom: 1 },
-      h(Box, null,
-        h(Text, { color: 'magenta', bold: true }, '◆'),
-        h(Text, { color: 'gray' }, ' Lannr')
-      ),
+    ) : completedAssistant ? h(Box, { flexDirection: 'column', marginTop: 1, marginBottom: 1 },
+      h(AssistantLabel, { agentName: state.agentName || state.agentId }),
       h(Box, { paddingLeft: 2 },
         h(Markdown, null, completedAssistant)
       )
@@ -1249,31 +1395,89 @@ export function ChatApp(opts) {
       onCancel: onModelsMenuCancel,
     }) : null,
     h(InputBar, { value: inputValue, onChange: handleInputChange, onSubmit: handleSubmit, isStreaming, suggestions, suggestionIdx, queuedCount, cursorBump, historyRef: inputHistoryRef, paused: Boolean(activeClarify) || Boolean(sessionsMenu) || Boolean(agentsMenu) || Boolean(modelsMenu) }),
-    h(Box, { paddingX: 2 },
-      h(Text, { color: 'gray', dimColor: true },
-        `agent:${state.agentName || state.agentId || 'default'} · session:${state.session}` +
-        (state.provider ? ` · provider:${state.provider}` : '') +
-        (state.model ? ` · model:${state.model}` : '') +
-        (todos.length ? ` · 📋${todos.filter(t => t.status==='completed').length}/${todos.length}` : '') +
-        (sessionTokens ? ` · ↑${formatTokens(sessionTokens.inputTokens)} ↓${formatTokens(sessionTokens.outputTokens)}${formatCacheTokens(sessionTokens)}${formatCacheHitPct(sessionTokens)}` : '') +
-        (rateState ? ` · ${formatRateStateCompact(rateState) ?? ''}` : '') +
-        '  [esc] stop turn  [/exit] quit'
-      )
-    )
+    h(StatusBar, {
+      agentName: state.agentName || state.agentId,
+      session: state.session,
+      provider: state.provider,
+      model: state.model,
+      todos,
+      windowUsage: lastTurnUsage,
+      rateState,
+      confirmQuit,
+      isStreaming,
+    })
   );
 }
 
 // ─── Slash command handler ────────────────────────────────────────────────────
 
-async function handleSlashCommand(command, agentState, conversationHistory, historyLimit, setStaticItems, setSessionTokens, exit, onSessionChange, setCompacting, compactingClearRef, setSessionsMenu, setAgentsMenu, setModelsMenu, lastUsage) {
+async function handleSlashCommand(command, agentState, conversationHistory, historyLimit, setStaticItems, setSessionTokens, exit, onSessionChange, setCompacting, compactingClearRef, setSessionsMenu, setAgentsMenu, setModelsMenu, lastUsage, ctx: Record<string, any> = {}) {
   const [name, ...args] = command.slice(1).trim().split(/\s+/);
   const rest = args.join(' ').trim();
   const state = agentState.current;
 
-  const addInfo = text => setStaticItems(prev => [...prev, { type: 'info', id: `i-${Date.now()}`, text }]);
+  const addInfo = text => setStaticItems(prev => [...prev, { type: 'info', id: nextItemId('i'), text }]);
 
   switch (name.toLowerCase()) {
     case 'q': case 'quit': case 'exit': exit(); break;
+    case 'fortune':
+      setStaticItems(prev => [...prev, { type: 'fortune', id: `ft-${Date.now()}`, text: randomFortune() }]);
+      break;
+    case 'theme': {
+      if (!rest) {
+        const names = themeNames().map((t) => `${t.name === theme().name ? '●' : '○'} ${t.name.padEnd(10)} ${t.label}`);
+        addInfo(`themes (current: ${theme().name}) — /theme <name>`);
+        for (const line of names) addInfo(`  ${line}`);
+        break;
+      }
+      const applied = setTheme(rest);
+      if (!applied) { addInfo(`unknown theme: ${rest} (try /theme to list)`); break; }
+      persistTheme(applied.name).catch(() => {});
+      ctx.repaint?.();
+      addInfo(`theme: ${applied.label}`);
+      break;
+    }
+    case 'copy': {
+      const last = [...conversationHistory.current].reverse().find((m) => m.role === 'assistant');
+      const text = last ? (typeof last.content === 'string' ? last.content : splitUserContent(last.content).text) : '';
+      if (!text) { addInfo('nothing to copy yet'); break; }
+      const tool = await copyToClipboard(text);
+      addInfo(tool ? `copied last reply to clipboard (${text.length} chars)` : 'clipboard unavailable (install pbcopy/xclip/wl-copy)');
+      break;
+    }
+    case 'save': {
+      const messages = conversationHistory.current;
+      if (!messages.length) { addInfo('nothing to save (history is empty)'); break; }
+      const path = resolvePath(process.cwd(), rest || `lannr-${state.session}.md`);
+      try {
+        await writeFile(path, renderTranscript(state, messages));
+        addInfo(`saved transcript → ${path}`);
+      } catch (error) {
+        addInfo(`save failed: ${error instanceof Error ? error.message : String(error)}`);
+      }
+      break;
+    }
+    case 'title': {
+      if (!rest) { addInfo('usage: /title <name>'); break; }
+      try {
+        await persistSessionTitle(state.agentId, state.session, rest);
+        addInfo(`session title: ${rest}`);
+      } catch (error) {
+        addInfo(`title failed: ${error instanceof Error ? error.message : String(error)}`);
+      }
+      break;
+    }
+    case 'retry': {
+      const last = [...conversationHistory.current].reverse().find((m) => m.role === 'user');
+      if (!last) { addInfo('nothing to retry yet'); break; }
+      // Drop the trailing assistant reply (if any) so the model regenerates it.
+      const hist = conversationHistory.current;
+      if (hist.length && hist[hist.length - 1].role === 'assistant') hist.pop();
+      const { text } = splitUserContent(last.content);
+      setStaticItems(prev => [...prev, { type: 'info', id: `rt-${Date.now()}`, text: `retrying: ${text.slice(0, 60)}${text.length > 60 ? '…' : ''}` }]);
+      ctx.enqueue?.(last.content);
+      break;
+    }
     case 'help':
       setStaticItems(prev => [...prev, { type: 'help', id: `help-${Date.now()}` }]);
       break;
@@ -1294,6 +1498,7 @@ async function handleSlashCommand(command, agentState, conversationHistory, hist
       }]);
       break;
     }
+    case 'usage':
     case 'context': {
       try {
         // Rebuild the runtime exactly as a turn would, so the breakdown reflects
@@ -1378,7 +1583,7 @@ async function handleSlashCommand(command, agentState, conversationHistory, hist
           conversationTokens: seg.conversation, messageCount,
           model, provider: provider?.id,
           exact, source,
-          lastUsage,
+          lastUsage, sessionTokens: ctx.sessionTokens,
           ...modelContextWindow(model),
         }]);
       } catch (error) {
@@ -1461,10 +1666,12 @@ async function handleSlashCommand(command, agentState, conversationHistory, hist
       else setStaticItems(prev => [...prev, { type: 'history', id: `hi-${Date.now()}`, messages: h }]);
       break;
     }
+    case 'verbose':
     case 'tools':
       agentState.current.showTools = rest === 'off' ? false : rest === 'on' ? true : !state.showTools;
       addInfo(`tool output: ${agentState.current.showTools ? 'on' : 'off'}`);
       break;
+    case 'reasoning':
     case 'thinking':
       agentState.current.showThinking = rest === 'off' ? false : rest === 'on' ? true : !state.showThinking;
       addInfo(`thinking output: ${agentState.current.showThinking ? 'on' : 'off'}`);
@@ -1615,6 +1822,51 @@ async function persistSessionModel(agentId, sessionId, model, provider) {
   if (provider) session.provider = provider;
   session.updatedAt = new Date().toISOString();
   await saveSession(agent, session);
+}
+
+// Persist a human-readable title onto the session record. Sessions are stored
+// as loose JSON, so an extra `title` field rides along harmlessly.
+async function persistSessionTitle(agentId, sessionId, title) {
+  if (!sessionId) return;
+  const config = await loadConfig();
+  const key = agentId ?? config.defaultAgentId;
+  const agent = config.agents[key] ?? Object.values(config.agents).find((entry) => (
+    entry.id === key || entry.name?.toLowerCase() === String(key).toLowerCase() || entry.aliases?.includes(key)
+  ));
+  if (!agent) return;
+  const session = await loadSession(agent, sessionId);
+  (session as any).title = title;
+  session.updatedAt = new Date().toISOString();
+  await saveSession(agent, session);
+}
+
+// Render the conversation as a portable markdown transcript for `/save`.
+function renderTranscript(state, messages) {
+  const lines = [
+    `# Lannr transcript`,
+    '',
+    `- agent: ${state.agentName || state.agentId || 'default'}`,
+    `- session: ${state.session}`,
+    state.model ? `- model: ${state.model}${state.provider ? ` (${state.provider})` : ''}` : null,
+    `- exported: ${new Date().toISOString()}`,
+    '',
+    '---',
+    '',
+  ].filter((line) => line !== null);
+  for (const msg of messages) {
+    if (msg.role === 'user') {
+      const { text, images } = splitUserContent(msg.content);
+      lines.push(`### You`, '', text || '(no text)');
+      if (images.length) lines.push('', `_(${images.length} image attachment${images.length === 1 ? '' : 's'})_`);
+    } else if (msg.role === 'assistant') {
+      const text = typeof msg.content === 'string' ? msg.content : splitUserContent(msg.content).text;
+      lines.push(`### Lannr`, '', text || '');
+    } else {
+      continue;
+    }
+    lines.push('');
+  }
+  return lines.join('\n');
 }
 
 async function createNewChatSession(agentId) {

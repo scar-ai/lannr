@@ -5,12 +5,14 @@
 
 import React, { useState } from 'react'
 import { Box, Text, useInput } from 'ink'
+import { theme } from './theme.js'
 
 const h = React.createElement
 
 const VISIBLE_ROWS = 10
 
 export function AgentsMenu({ agents, currentAgentId, onSelect, onCancel }) {
+  const c = theme()
   const [index, setIndex] = useState(() => {
     const idx = agents.findIndex((a) => a.id === currentAgentId)
     return idx >= 0 ? idx : 0
@@ -39,15 +41,15 @@ export function AgentsMenu({ agents, currentAgentId, onSelect, onCancel }) {
       marginY: 1,
       paddingX: 2,
       borderStyle: 'round',
-      borderColor: 'cyan',
+      borderColor: c.accentDim,
       alignSelf: 'center',
     },
-      h(Text, { color: 'cyan', bold: true }, 'Agents'),
+      h(Text, { color: c.accent, bold: true }, 'Agents'),
       h(Box, { marginTop: 1 },
-        h(Text, { color: 'gray' }, 'No agents configured.')
+        h(Text, { color: c.muted }, 'No agents configured.')
       ),
       h(Box, { marginTop: 1 },
-        h(Text, { color: 'gray', dimColor: true }, 'esc dismiss')
+        h(Text, { color: c.dim, dimColor: true }, 'esc dismiss')
       )
     )
   }
@@ -66,11 +68,11 @@ export function AgentsMenu({ agents, currentAgentId, onSelect, onCancel }) {
       paddingX: 2,
       paddingY: 1,
       borderStyle: 'round',
-      borderColor: 'cyan',
+      borderColor: c.accentDim,
     },
       h(Box, null,
-        h(Text, { color: 'cyan', bold: true }, 'Agents  '),
-        h(Text, { color: 'gray', dimColor: true }, `(${agents.length} total)`)
+        h(Text, { color: c.accent, bold: true }, 'Agents  '),
+        h(Text, { color: c.dim, dimColor: true }, `(${agents.length} total)`)
       ),
       h(Box, { flexDirection: 'column', marginTop: 1 },
         ...window.map((a, i) => {
@@ -79,17 +81,17 @@ export function AgentsMenu({ agents, currentAgentId, onSelect, onCancel }) {
           const isCurrent = a.id === currentAgentId
           const description = (a.description || '').trim()
           return h(Box, { key: a.id },
-            h(Text, { color: active ? 'cyan' : 'gray' }, active ? '❯ ' : '  '),
-            h(Text, { color: active ? 'white' : 'gray', bold: active }, a.id.padEnd(idWidth)),
-            h(Text, { color: 'gray', dimColor: true }, '  '),
-            h(Text, { color: active ? 'white' : 'gray', wrap: 'truncate-end' },
+            h(Text, { color: active ? c.accent : c.muted }, active ? '❯ ' : '  '),
+            h(Text, { color: active ? c.text : c.muted, bold: active }, a.id.padEnd(idWidth)),
+            h(Text, { color: c.dim, dimColor: true }, '  '),
+            h(Text, { color: active ? c.text : c.muted, wrap: 'truncate-end' },
               description || a.name || ''),
-            isCurrent ? h(Text, { color: 'green', dimColor: true }, '  (current)') : null,
+            isCurrent ? h(Text, { color: c.success, dimColor: true }, '  (current)') : null,
           )
         })
       ),
       h(Box, { marginTop: 1 },
-        h(Text, { color: 'gray', dimColor: true }, '↑↓ navigate  ↵ switch  esc cancel')
+        h(Text, { color: c.dim, dimColor: true }, '↑↓ navigate  ↵ switch  esc cancel')
       )
     )
   )

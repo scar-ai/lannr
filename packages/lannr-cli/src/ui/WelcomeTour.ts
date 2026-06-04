@@ -1,7 +1,22 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Box, Text, useInput } from 'ink'
+import { theme } from './theme.js'
 
 const h = React.createElement
+
+// Each slide carries a decorative accent name; resolve it against the active
+// palette so the tour follows the user's chosen theme.
+function tone(name, c) {
+  switch (name) {
+    case 'magenta': return c.assistant
+    case 'green': return c.success
+    case 'yellow': return c.warn
+    case 'blue': return c.accentDim
+    case 'red': return c.error
+    case 'cyan': return c.accent
+    default: return c.accent
+  }
+}
 
 const SLIDES = [
   {
@@ -158,31 +173,33 @@ export function WelcomeTour({ onDone }) {
 
   const remainingMs = Math.max(0, AUTO_ADVANCE_MS - elapsedSinceTyped)
   const cursorOn = Math.floor(tick / 6) % 2 === 0
+  const c = theme()
+  const slideTone = tone(slide.color, c)
 
   return h(Box, { flexDirection: 'column', paddingX: 1, paddingY: 1 },
     h(Box, { marginBottom: 1, justifyContent: 'space-between' },
       h(Box, null,
-        h(Text, { color: 'gray' }, `step ${index + 1} of ${SLIDES.length}  `),
-        h(Text, { color: 'cyan' }, renderProgress(index, SLIDES.length)),
+        h(Text, { color: c.muted }, `step ${index + 1} of ${SLIDES.length}  `),
+        h(Text, { color: c.accent }, renderProgress(index, SLIDES.length)),
       ),
-      h(Text, { color: paused ? 'yellow' : 'gray', dimColor: !paused },
+      h(Text, { color: paused ? c.warn : c.dim, dimColor: !paused },
         paused ? '⏸ paused' : typingDone ? `▶ auto-advance in ${Math.ceil(remainingMs / 1000)}s` : '▶ typing…',
       ),
     ),
-    h(Box, { borderStyle: 'round', borderColor: slide.color, paddingX: 2, paddingY: 1, flexDirection: 'column' },
+    h(Box, { borderStyle: 'round', borderColor: slideTone, paddingX: 2, paddingY: 1, flexDirection: 'column' },
       h(Box, null,
-        h(Text, { color: slide.color, bold: true }, `${slide.icon}  ${slide.title}`),
+        h(Text, { color: slideTone, bold: true }, `${slide.icon}  ${slide.title}`),
       ),
       h(Box, { marginTop: 1, flexDirection: 'column' },
         ...renderTypedLines(slide.lines, charsRevealed, !typingDone && cursorOn),
       ),
       slide.hint
         ? h(Box, { marginTop: 1 },
-            h(Text, { color: 'gray', dimColor: true }, `↳ ${slide.hint}`))
+            h(Text, { color: c.dim, dimColor: true }, `↳ ${slide.hint}`))
         : null,
     ),
     h(Box, { marginTop: 1, paddingX: 1, justifyContent: 'space-between' },
-      h(Text, { color: 'gray', dimColor: true },
+      h(Text, { color: c.dim, dimColor: true },
         '←  prev    →/↵/space  next    any key  reveal    p  pause    esc  skip'),
     ),
   )
@@ -200,6 +217,7 @@ function renderProgress(index, total) {
 }
 
 function renderTypedLines(lines, charsRevealed, showCursor) {
+  const c = theme()
   const nodes = []
   let remaining = charsRevealed
   for (let i = 0; i < lines.length; i++) {
@@ -209,8 +227,8 @@ function renderTypedLines(lines, charsRevealed, showCursor) {
     const isCurrentlyTyping = visible.length > 0 && visible.length < full.length
     nodes.push(
       h(Box, { key: i },
-        h(Text, { color: 'white' }, visible || ' '),
-        showCursor && isCurrentlyTyping ? h(Text, { color: 'cyan' }, '▏') : null,
+        h(Text, { color: c.text }, visible || ' '),
+        showCursor && isCurrentlyTyping ? h(Text, { color: c.accent }, '▏') : null,
       ),
     )
   }

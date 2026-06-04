@@ -15,6 +15,7 @@
 //   Ctrl+U                 delete to line start
 //   Ctrl+K                 delete to line end
 //   Enter                  submit
+//   Shift+Enter            insert newline
 //
 // Tab / Esc / Ctrl+C are intentionally left untouched so the parent
 // ChatApp can own autocomplete / stream-cancel / quit.
@@ -29,6 +30,7 @@ import {
   isWordLeftSeq,
   isWordRightSeq,
 } from './LineEditor.js'
+import { theme } from './theme.js'
 
 const h = React.createElement
 
@@ -44,9 +46,10 @@ export function InputBar({
   cursorBump,
   historyRef,
 }) {
+  const c = theme()
   const placeholder = isStreaming
     ? 'Type to queue a message  (sent when current turn finishes)'
-    : 'Send a message  (/help for commands · !cmd for shell · drag in images)'
+    : 'Send a message  (/help · !cmd for shell · drag in images)'
 
   const [cursor, setCursor] = useState(value.length)
 
@@ -118,6 +121,16 @@ export function InputBar({
     if (suggestions.length > 0 && (key.upArrow || key.downArrow)) return
 
     if (key.return) {
+      // Shift+Enter inserts a newline instead of submitting (when the terminal
+      // reports the modifier). Many terminals also deliver a bare newline (\n,
+      // 0x0a) for Shift/Option+Enter while a plain Enter arrives as \r — treat
+      // that as a line break too.
+      if (key.shift || input === '\n') {
+        setHistIdx(null)
+        onChange?.(value.slice(0, cursor) + '\n' + value.slice(cursor))
+        setCursor(cursor + 1)
+        return
+      }
       // Parent ChatApp owns Enter when slash-command suggestions are open
       // (it submits the highlighted command directly).
       if (suggestions.length > 0) return
@@ -219,33 +232,33 @@ export function InputBar({
 
   return h(Box, { flexDirection: 'column' },
     suggestions.length > 0 ? h(Box, {
-      flexDirection: 'column', borderStyle: 'round', borderColor: 'gray', paddingX: 1, marginBottom: 0,
+      flexDirection: 'column', borderStyle: 'round', borderColor: c.accentDim, paddingX: 1, marginBottom: 0,
     },
       ...suggestions.slice(0, 8).map((s, i) =>
         h(Box, { key: s.cmd },
-          h(Text, { color: i === suggestionIdx ? 'cyan' : 'gray', bold: i === suggestionIdx },
-            `${i === suggestionIdx ? '❯ ' : '  '}${s.cmd.padEnd(14)}`
+          h(Text, { color: i === suggestionIdx ? c.accent : c.muted, bold: i === suggestionIdx },
+            `${i === suggestionIdx ? '❯ ' : '  '}${s.cmd.padEnd(12)}`
           ),
-          h(Text, { color: 'gray' }, s.desc)
+          h(Text, { color: c.dim }, s.desc)
         )
       ),
       h(Box, { marginTop: 0 },
-        h(Text, { color: 'gray', dimColor: true }, '[enter] run  [tab] complete  [↑↓] navigate  [esc] dismiss')
+        h(Text, { color: c.dim }, '[enter] run  [tab] complete  [↑↓] navigate  [esc] dismiss')
       )
     ) : null,
-    h(Box, { borderStyle: 'round', borderColor: isStreaming ? 'yellow' : 'cyan', paddingX: 1 },
-      h(Text, { color: isStreaming ? 'yellow' : 'cyan' }, isStreaming ? '⋯ ' : '> '),
-      renderEditor(value, cursor, placeholder),
-      queuedCount > 0 ? h(Text, { color: 'yellow', dimColor: true }, `  (${queuedCount} queued)`) : null
+    h(Box, { borderStyle: 'round', borderColor: isStreaming ? c.warn : c.accent, paddingX: 1 },
+      h(Text, { color: isStreaming ? c.warn : c.accent, bold: true }, isStreaming ? '⋯ ' : '❯ '),
+      renderEditor(value, cursor, placeholder, c),
+      queuedCount > 0 ? h(Text, { color: c.warn, dimColor: true }, `  (${queuedCount} queued)`) : null
     )
   )
 }
 
-function renderEditor(value, cursor, placeholder) {
+function renderEditor(value, cursor, placeholder, c) {
   if (!value) {
     return h(Box, null,
       h(Text, { inverse: true }, ' '),
-      h(Text, { color: 'gray', dimColor: true }, placeholder)
+      h(Text, { color: c.dim }, placeholder)
     )
   }
   const safeCursor = Math.max(0, Math.min(cursor, value.length))

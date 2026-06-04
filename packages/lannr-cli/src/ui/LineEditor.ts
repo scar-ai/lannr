@@ -21,6 +21,7 @@
 
 import React, { useEffect, useState } from 'react'
 import { Box, Text, useInput } from 'ink'
+import { theme } from './theme.js'
 
 const h = React.createElement
 
@@ -142,7 +143,7 @@ function renderLine(value, cursor, placeholder, mask) {
   if (!value) {
     return h(Box, null,
       h(Text, { inverse: true }, ' '),
-      placeholder ? h(Text, { color: 'gray', dimColor: true }, placeholder) : null
+      placeholder ? h(Text, { color: theme().dim, dimColor: true }, placeholder) : null
     )
   }
   const shown = mask ? mask.repeat(value.length) : value

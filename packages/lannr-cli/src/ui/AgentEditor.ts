@@ -6,10 +6,12 @@
 import React, { useState } from 'react'
 import { Box, Text, useApp, useInput } from 'ink'
 import { LineEditor } from './LineEditor.js'
+import { theme } from './theme.js'
 
 const h = React.createElement
 
 export function AgentEditor({ agent, providers, skills, onSave }) {
+  const c = theme()
   const { exit } = useApp()
 
   const allowedInit = {}
@@ -125,31 +127,31 @@ export function AgentEditor({ agent, providers, skills, onSave }) {
 
   if (error) {
     return h(Box, { flexDirection: 'column', paddingY: 1, paddingX: 2 },
-      h(Text, { color: 'red' }, `edit error: ${error}`)
+      h(Text, { color: c.error }, `edit error: ${error}`)
     )
   }
 
   if (skillsOpen) {
     return h(Box, { flexDirection: 'column', paddingY: 1, paddingX: 2 },
       h(Box, { marginBottom: 1 },
-        h(Text, { color: 'cyan', bold: true }, '⬡ Allowed skills')
+        h(Text, { color: c.accent, bold: true }, '⬡ Allowed skills')
       ),
       skills.length === 0
-        ? h(Text, { color: 'gray', dimColor: true }, 'No skills installed.')
+        ? h(Text, { color: c.dim, dimColor: true }, 'No skills installed.')
         : h(Box, { flexDirection: 'column' },
           ...skills.map((s, i) => {
             const active = i === skillIdx
             const on = draft.allowed[s.name]
             return h(Box, { key: s.name },
-              h(Text, { color: active ? 'cyan' : 'gray' }, active ? '❯ ' : '  '),
-              h(Text, { color: on ? 'green' : 'gray' }, on ? '[x] ' : '[ ] '),
-              h(Text, { color: active ? 'white' : 'gray', bold: active }, s.name),
-              s.description ? h(Text, { color: 'gray', dimColor: true }, `  ${s.description}`) : null
+              h(Text, { color: active ? c.accent : c.muted }, active ? '❯ ' : '  '),
+              h(Text, { color: on ? c.success : c.muted }, on ? '[x] ' : '[ ] '),
+              h(Text, { color: active ? c.text : c.muted, bold: active }, s.name),
+              s.description ? h(Text, { color: c.dim, dimColor: true }, `  ${s.description}`) : null
             )
           })
         ),
       h(Box, { marginTop: 1 },
-        h(Text, { color: 'gray', dimColor: true }, '↑↓ navigate  space toggle  a toggle all  esc back')
+        h(Text, { color: c.dim, dimColor: true }, '↑↓ navigate  space toggle  a toggle all  esc back')
       )
     )
   }
@@ -166,47 +168,48 @@ export function AgentEditor({ agent, providers, skills, onSave }) {
 
   return h(Box, { flexDirection: 'column', paddingY: 1, paddingX: 2 },
     h(Box, { marginBottom: 1 },
-      h(Text, { color: 'cyan', bold: true }, `⬡ Edit agent  `),
-      h(Text, { color: 'gray', dimColor: true }, agent.id)
+      h(Text, { color: c.accent, bold: true }, `⬡ Edit agent  `),
+      h(Text, { color: c.dim, dimColor: true }, agent.id)
     ),
     ...fields.map((field, i) => {
       const active = i === index
       return h(Box, { key: field.key },
-        h(Text, { color: active ? 'cyan' : 'gray' }, active ? '❯ ' : '  '),
+        h(Text, { color: active ? c.accent : c.muted }, active ? '❯ ' : '  '),
         field.type === 'action'
-          ? h(Text, { color: active ? 'green' : 'gray', bold: active }, field.label)
+          ? h(Text, { color: active ? c.success : c.muted, bold: active }, field.label)
           : h(React.Fragment, null,
-            h(Text, { color: active ? 'white' : 'gray', bold: active }, field.label.padEnd(16)),
+            h(Text, { color: active ? c.text : c.muted, bold: active }, field.label.padEnd(16)),
             renderValue(field, draft, active, editing, setDraft, setEditing)
           )
       )
     }),
     h(Box, { marginTop: 1 },
-      h(Text, { color: status ? 'green' : 'gray', dimColor: !status }, hint)
+      h(Text, { color: status ? c.success : c.dim, dimColor: !status }, hint)
     )
   )
 }
 
 function renderValue(field, draft, active, editing, setDraft, setEditing) {
+  const c = theme()
   if (field.type === 'boolean') {
     const on = draft[field.key]
-    return h(Text, { color: on ? 'green' : 'gray' }, on ? '[x]' : '[ ]')
+    return h(Text, { color: on ? c.success : c.muted }, on ? '[x]' : '[ ]')
   }
   if (field.type === 'choice') {
     return h(Text, null,
-      h(Text, { color: active ? 'cyan' : 'gray' }, '‹ '),
-      h(Text, { color: active ? 'green' : 'gray', bold: active }, draft.providerId),
-      h(Text, { color: active ? 'cyan' : 'gray' }, ' ›')
+      h(Text, { color: active ? c.accent : c.muted }, '‹ '),
+      h(Text, { color: active ? c.success : c.muted, bold: active }, draft.providerId),
+      h(Text, { color: active ? c.accent : c.muted }, ' ›')
     )
   }
   if (field.type === 'skills') {
     const all = Object.values(draft.allowed)
     const on = all.filter(Boolean).length
-    return h(Text, { color: 'gray' }, `${on}/${all.length} allowed`)
+    return h(Text, { color: c.muted }, `${on}/${all.length} allowed`)
   }
   // text
   if (active && editing) {
-    return h(Box, { borderStyle: 'round', borderColor: 'cyan', paddingX: 1 },
+    return h(Box, { borderStyle: 'round', borderColor: c.accent, paddingX: 1 },
       h(LineEditor, {
         value: draft[field.key],
         onChange: (v) => setDraft((d) => ({ ...d, [field.key]: v })),
@@ -218,5 +221,5 @@ function renderValue(field, draft, active, editing, setDraft, setEditing) {
   const display = value
     ? (value.length > 48 ? `${value.slice(0, 48)}…` : value)
     : '—'
-  return h(Text, { color: value ? (active ? 'white' : 'gray') : 'gray', dimColor: !value, wrap: 'truncate-end' }, display)
+  return h(Text, { color: value ? (active ? c.text : c.muted) : c.dim, dimColor: !value, wrap: 'truncate-end' }, display)
 }

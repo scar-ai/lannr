@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Text, useApp, useInput } from 'ink';
 import { SETTING_DEFS, loadSettings, saveSettings } from '../settings.js';
+import { theme } from './theme.js';
 
 const h = React.createElement;
 
@@ -94,14 +95,15 @@ export function SettingsTui() {
     }
   });
 
+  const c = theme();
   if (error) {
     return h(Box, { flexDirection: 'column', paddingY: 1, paddingX: 2 },
-      h(Text, { color: 'red' }, `settings error: ${error}`)
+      h(Text, { color: c.error }, `settings error: ${error}`)
     );
   }
   if (!draft) {
     return h(Box, { paddingX: 2, paddingY: 1 },
-      h(Text, { color: 'gray', dimColor: true }, 'loading settings…')
+      h(Text, { color: c.dim, dimColor: true }, 'loading settings…')
     );
   }
 
@@ -114,45 +116,46 @@ export function SettingsTui() {
 
   return h(Box, { flexDirection: 'column', paddingY: 1, paddingX: 2 },
     h(Box, { marginBottom: 1 },
-      h(Text, { color: 'cyan', bold: true }, '⬡ Lannr settings')
+      h(Text, { color: c.accent, bold: true }, '⬡ Lannr settings')
     ),
     ...SETTING_DEFS.map((def, i) => {
       const active = i === index;
       const value = draft[def.key];
       return h(Box, { key: def.key, flexDirection: 'column', marginBottom: 1 },
         h(Box, null,
-          h(Text, { color: active ? 'cyan' : 'gray' }, active ? '❯ ' : '  '),
+          h(Text, { color: active ? c.accent : c.muted }, active ? '❯ ' : '  '),
           renderControl(def, value, active, editing && active, editBuffer),
           h(Text, null, ' '),
-          h(Text, { color: active ? 'white' : 'gray', bold: active }, def.label)
+          h(Text, { color: active ? c.text : c.muted, bold: active }, def.label)
         ),
         h(Box, { paddingLeft: 6 },
-          h(Text, { color: 'gray', dimColor: true }, def.description)
+          h(Text, { color: c.dim, dimColor: true }, def.description)
         )
       );
     }),
     h(Box, { marginTop: 1 },
-      h(Text, { color: savedMessage ? 'green' : 'gray', dimColor: !savedMessage }, hint)
+      h(Text, { color: savedMessage ? c.success : c.dim, dimColor: !savedMessage }, hint)
     )
   );
 }
 
 function renderControl(def, value, active, isEditing, editBuffer) {
+  const c = theme();
   if (def.type === 'boolean') {
     const box = value ? '[x]' : '[ ]';
-    return h(Text, { color: value ? 'green' : 'gray' }, box);
+    return h(Text, { color: value ? c.success : c.muted }, box);
   }
   if (def.type === 'number') {
     if (isEditing) {
-      return h(Text, { color: 'yellow' }, `‹ ${editBuffer || '0'}_ ›`);
+      return h(Text, { color: c.warn }, `‹ ${editBuffer || '0'}_ ›`);
     }
-    const arrowColor = active ? 'cyan' : 'gray';
-    const valueColor = active ? 'green' : 'gray';
+    const arrowColor = active ? c.accent : c.muted;
+    const valueColor = active ? c.success : c.muted;
     return h(Text, null,
       h(Text, { color: arrowColor }, '‹ '),
       h(Text, { color: valueColor, bold: active }, String(value)),
       h(Text, { color: arrowColor }, ' ›')
     );
   }
-  return h(Text, { color: 'gray' }, String(value));
+  return h(Text, { color: c.muted }, String(value));
 }

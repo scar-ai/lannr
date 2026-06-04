@@ -10,6 +10,10 @@ import {
   parseRunAt,
 } from '../scheduling.js'
 
+// Surfaced to the user after every schedule is created: scheduled work only
+// fires while the gateway is up (the open CLI session, or `lannr gateway up`).
+const GATEWAY_NOTE = 'The Lannr gateway must be running for this to fire — it only executes while this CLI session is open or `lannr gateway up` is running. If the gateway is down, it will not run until it is back up.'
+
 export function createScheduleTools(ctx) {
   const { agent, memory } = ctx
   const schedulerStore = createAgentReactiveRoutineStore(agent)
@@ -44,6 +48,7 @@ export function createScheduleTools(ctx) {
           cron: z.string().optional(),
         }),
         enabled: z.boolean(),
+        note: z.string(),
       }),
       sideEffect: true,
       handler: async (input) => {
@@ -89,6 +94,7 @@ export function createScheduleTools(ctx) {
             ? { type: 'cron', cron: request.cron }
             : { type: 'once', runAt: reactive.nextRunAt.toISOString() },
           enabled: true,
+          note: GATEWAY_NOTE,
         }
       },
     }),
@@ -121,6 +127,7 @@ export function createScheduleTools(ctx) {
         trigger: z.object({ type: z.string() }).passthrough(),
         nextRunAt: z.string().nullable(),
         enabled: z.boolean(),
+        note: z.string(),
       }),
       sideEffect: true,
       handler: async (input) => {
@@ -154,6 +161,7 @@ export function createScheduleTools(ctx) {
           trigger,
           nextRunAt: nextRunAt ? nextRunAt.toISOString() : null,
           enabled: true,
+          note: GATEWAY_NOTE,
         }
       },
     }),
@@ -223,6 +231,7 @@ export function createScheduleTools(ctx) {
           cron: z.string().optional(),
         }),
         enabled: z.boolean(),
+        note: z.string(),
       }),
       sideEffect: true,
       handler: async (input) => {
@@ -253,6 +262,7 @@ export function createScheduleTools(ctx) {
             ? { type: 'cron', cron: request.cron }
             : { type: 'once', runAt: nextRunAt.toISOString() },
           enabled: true,
+          note: GATEWAY_NOTE,
         }
       },
     }),
