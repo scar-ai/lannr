@@ -30,6 +30,10 @@ import {
   isWordLeftSeq,
   isWordRightSeq,
   isShiftEnterSeq,
+  rowColFromIndex,
+  indexFromRowCol,
+  lineStartIndex,
+  lineEndIndex,
 } from './LineEditor.js'
 import { theme } from './theme.js'
 
@@ -169,9 +173,9 @@ export function InputBar({
       return
     }
 
-    // Raw Home/End escape sequences some terminals send.
-    if (isHomeSeq(input)) { setCursor(0); return }
-    if (isEndSeq(input)) { setCursor(value.length); return }
+    // Raw Home/End escape sequences some terminals send — line-relative.
+    if (isHomeSeq(input)) { setCursor(lineStartIndex(value, cursor)); return }
+    if (isEndSeq(input)) { setCursor(lineEndIndex(value, cursor)); return }
 
     // Option+arrow sequences that bypass ink's arrow-key parsing.
     if (isWordLeftSeq(input, key)) { setCursor(prevWordBoundary(value, cursor)); return }
@@ -187,27 +191,26 @@ export function InputBar({
       else setCursor(Math.min(value.length, cursor + 1))
       return
     }
-    // ↑ at the top row recalls the previous entry; ↓ at the bottom row the
-    // next. When the cursor is on an interior row of a multi-line value, the
-    // arrows move between rows instead (handled by leaving them to the terminal
-    // — value is single visual line in practice, so this is effectively always
-    // top+bottom). "Top row" = no newline before the cursor; "bottom row" = no
-    // newline after it.
+    // ↑ on the top row recalls the previous history entry; ↓ on the bottom row
+    // the next. On any interior row of a multi-line value the arrows move the
+    // caret between rows, preserving the column (clamped to the target line's
+    // length) — exactly how a real text editor behaves.
     if (key.upArrow) {
-      const atTopRow = !value.slice(0, cursor).includes('\n')
-      if (atTopRow) recallPrev()
-      else setCursor(cursor - 1) // move up a row: step before the preceding newline boundary
+      const { row, col } = rowColFromIndex(value, cursor)
+      if (row === 0) recallPrev()
+      else setCursor(indexFromRowCol(value, row - 1, col))
       return
     }
     if (key.downArrow) {
-      const atBottomRow = !value.slice(cursor).includes('\n')
-      if (atBottomRow) recallNext()
-      else setCursor(cursor + 1)
+      const { row, col } = rowColFromIndex(value, cursor)
+      const lastRow = value.split('\n').length - 1
+      if (row === lastRow) recallNext()
+      else setCursor(indexFromRowCol(value, row + 1, col))
       return
     }
 
-    if (key.ctrl && input === 'a') { setCursor(0); return }
-    if (key.ctrl && input === 'e') { setCursor(value.length); return }
+    if (key.ctrl && input === 'a') { setCursor(lineStartIndex(value, cursor)); return }
+    if (key.ctrl && input === 'e') { setCursor(lineEndIndex(value, cursor)); return }
     if (key.ctrl && input === 'u') {
       setHistIdx(null)
       onChange?.(value.slice(cursor))
@@ -300,13 +303,27 @@ function renderEditor(value, cursor, placeholder, c) {
       h(Text, { color: c.dim }, placeholder)
     )
   }
-  const safeCursor = Math.max(0, Math.min(cursor, value.length))
-  const before = value.slice(0, safeCursor)
-  const at = value.slice(safeCursor, safeCursor + 1) || ' '
-  const after = value.slice(safeCursor + 1)
-  return h(Box, null,
-    before ? h(Text, null, before) : null,
-    h(Text, { inverse: true }, at),
-    after ? h(Text, null, after) : null
+  // Render as a column of rows so multi-line input wraps correctly and the
+  // inverse-video caret lands on its true (row, col). Splitting the whole value
+  // into three side-by-side Text nodes (the old approach) pinned the caret to
+  // the top line because Ink lays sibling Text out in a row, not following the
+  // embedded newlines.
+  const lines = value.split('\n')
+  const { row: curRow, col: curCol } = rowColFromIndex(value, cursor)
+  return h(Box, { flexDirection: 'column' },
+    ...lines.map((line, i) => {
+      if (i !== curRow) {
+        // Empty interior lines still need to occupy a row of height.
+        return h(Box, { key: i }, h(Text, null, line.length ? line : ' '))
+      }
+      const before = line.slice(0, curCol)
+      const at = line.slice(curCol, curCol + 1) || ' '
+      const after = line.slice(curCol + 1)
+      return h(Box, { key: i },
+        before ? h(Text, null, before) : null,
+        h(Text, { inverse: true }, at),
+        after ? h(Text, null, after) : null
+      )
+    })
   )
 }

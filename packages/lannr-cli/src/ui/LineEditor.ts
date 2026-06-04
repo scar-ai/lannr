@@ -27,6 +27,39 @@ const h = React.createElement
 
 const WORD_RE = /\w/
 
+// Multi-line cursor geometry. The editor stores the caret as a flat index into
+// `text`; these convert to/from a visual (row, col) so vertical motion and
+// rendering line up. `col` is the offset within the line; `row` is how many
+// newlines precede the caret.
+export function rowColFromIndex(text, index) {
+  const i = Math.max(0, Math.min(index, text.length))
+  const before = text.slice(0, i)
+  const lastNl = before.lastIndexOf('\n')
+  const row = before.length === 0 ? 0 : (before.match(/\n/g) || []).length
+  const col = i - (lastNl + 1)
+  return { row, col }
+}
+
+export function indexFromRowCol(text, row, col) {
+  const lines = text.split('\n')
+  const r = Math.max(0, Math.min(row, lines.length - 1))
+  const c = Math.max(0, Math.min(col, lines[r].length))
+  let idx = 0
+  for (let i = 0; i < r; i++) idx += lines[i].length + 1 // +1 for the newline
+  return idx + c
+}
+
+// Start / end of the line the caret sits on (for line-relative Home/End).
+export function lineStartIndex(text, index) {
+  const i = Math.max(0, Math.min(index, text.length))
+  return text.lastIndexOf('\n', i - 1) + 1
+}
+export function lineEndIndex(text, index) {
+  const i = Math.max(0, Math.min(index, text.length))
+  const nl = text.indexOf('\n', i)
+  return nl === -1 ? text.length : nl
+}
+
 export function nextWordBoundary(text, from) {
   let pos = Math.min(from, text.length)
   while (pos < text.length && !WORD_RE.test(text[pos])) pos++
