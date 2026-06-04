@@ -1,6 +1,6 @@
 {
   "name": "lannr-extras",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Opt-in batteries for the Lannr runtime: memory, scheduling, workspace tools, browser tools, and MCP.",
   "license": "MIT",
   "type": "module",
@@ -22,7 +22,7 @@
     "./devtools": "./dist/devtools/index.js"
   },
   "dependencies": {
-    "lannr-core": "^0.1.0",
+    "lannr-core": "^0.2.1",
     "zod": "^3.24.1"
   }
 }
