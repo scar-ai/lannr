@@ -2,6 +2,7 @@
   "name": "lannr-core",
   "version": "0.2.0",
   "description": "Code-native agentic runtime for TypeScript.",
+  "license": "MIT",
   "type": "module",
   "files": [
     "dist/**/*.js",

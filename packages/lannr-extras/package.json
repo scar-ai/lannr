@@ -2,6 +2,7 @@
   "name": "lannr-extras",
   "version": "0.1.1",
   "description": "Opt-in batteries for the Lannr runtime: memory, scheduling, workspace tools, browser tools, and MCP.",
+  "license": "MIT",
   "type": "module",
   "files": [
     "dist/**/*.js",
